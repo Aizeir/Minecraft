@@ -53,6 +53,8 @@
         "xutility": "cpp",
         "fstream": "cpp",
         "sstream": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "functional": "cpp",
+        "list": "cpp"
     }
 }

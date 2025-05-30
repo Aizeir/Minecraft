@@ -6,6 +6,7 @@
 #include <sstream>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <math.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -18,8 +19,16 @@ int success; char info_log[512];
 // -1. Definitions
 typedef unsigned int uint;
 typedef unsigned char uchar;
+typedef glm::vec2 vec2;
 typedef glm::vec3 vec3;
+typedef glm::vec4 vec4;
 typedef glm::mat4 mat4;
+
+#define W 1280
+#define H 720
+
+inline float  rad(float  deg) {return glm::radians(deg);}
+inline double rad(double deg) {return glm::radians(deg);}
 
 // 0. UTIL
 string read_file(string path) {
@@ -44,6 +53,13 @@ string read_file(string path) {
     return content;
 }
 
+template <typename TYPENAME>
+TYPENAME clamp(TYPENAME value, TYPENAME minVal, TYPENAME maxVal) {
+    if (value < minVal) return minVal;
+    if (value > maxVal) return maxVal;
+    return value;
+}
+
 
 // I. SHADERS
 unsigned int load_shader(GLenum type, const char* source) {
@@ -52,6 +68,7 @@ unsigned int load_shader(GLenum type, const char* source) {
     glCompileShader(shader);
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
     if (!success) {
+        cout << source << endl;
         glGetShaderInfoLog(shader, 512, NULL, info_log);
         if (type == GL_VERTEX_SHADER)
              cout << "ERROR: VERTEX SHADER\n" << info_log << endl;
@@ -88,8 +105,10 @@ class Program { public:
     unsigned int ID;
 
     Program(string vert_path, string frag_path) {
-        const char* vert_code = read_file(vert_path).c_str();
-        const char* frag_code =  read_file(frag_path).c_str();
+        string vert_code_str = read_file(vert_path);
+        string frag_code_str = read_file(frag_path);
+        const char* vert_code = vert_code_str.c_str();
+        const char* frag_code = frag_code_str.c_str();
         ID = load_shader_program(vert_code, frag_code);
     }
 
