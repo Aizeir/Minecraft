@@ -6,6 +6,9 @@
 #include <sstream>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 using namespace std; 
@@ -15,6 +18,8 @@ int success; char info_log[512];
 // -1. Definitions
 typedef unsigned int uint;
 typedef unsigned char uchar;
+typedef glm::vec3 vec3;
+typedef glm::mat4 mat4;
 
 // 0. UTIL
 string read_file(string path) {
@@ -104,6 +109,10 @@ class Program { public:
     void set_float(const string &name, float value) const{
         glUniform1f(glGetUniformLocation(ID, name.c_str()), value); 
     }
+    // ------------------------------------------------------------------------
+    void set_mat4(const string &name, glm::mat4 mat) const{
+        glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, glm::value_ptr(mat));
+    }
 };
 
 // II. BUFFERS
@@ -126,18 +135,23 @@ unsigned int load_vertex_array(unsigned int vertices_num, float* vertices, unsig
 
 
 // III. Textures
-unsigned int load_texture(const char* path) {
+unsigned int load_texture(const char* path, uint colormap=GL_RGB) {
     int width, height, num_channels;
     unsigned char *data = stbi_load(path, &width, &height, &num_channels, 0);
 
     unsigned int texture;
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, colormap, GL_UNSIGNED_BYTE, data);
     glGenerateMipmap(GL_TEXTURE_2D);
     
     stbi_image_free(data);
     return texture;
+}
+
+void bind_texture(uint texture, uint unit) {
+    glActiveTexture(GL_TEXTURE0 + unit);
+    glBindTexture(GL_TEXTURE_2D, texture);
 }
 
 #endif
