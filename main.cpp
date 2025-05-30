@@ -2,6 +2,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include "util.cpp"
+#include <math.h>
 using namespace std; 
 
 
@@ -41,52 +42,43 @@ int main() {
     // Fenêtre
     GLFWwindow* window = setup();
 
-    // Shaders
-    const char *vertexShaderSource = "#version 330 core\n"
-    "layout (location = 0) in vec3 aPos;\n"
-    "void main() {\n"
-    "   gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
-    "}\0";
-    const char *fragmentShaderSource = "#version 330 core\n"
-    "out vec4 FragColor;\n"
-    "void main() {\n"
-    "   FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
-    "}\n\0";
-    const char *fragmentShaderSource2 = "#version 330 core\n"
-    "out vec4 FragColor;\n"
-    "void main() {\n"
-    "   FragColor = vec4(1.0f, 1.0f, 0.2f, 1.0f);\n"
-    "}\n\0";
-    
-    unsigned int program = load_shader_program(vertexShaderSource, fragmentShaderSource);
-    unsigned int program2 = load_shader_program(vertexShaderSource, fragmentShaderSource2);
+    // Shader
+    Program program = Program("shaders/triangle.vert", "shaders/triangle.frag");
 
     // Données des "primitives"
     float vertices[] = {
-        -0.5f,  0.5f, 0.0f, // top left 
-        0.5f,  0.5f, 0.0f,  // top right
-        -0.5f, -0.5f, 0.0f, // bottom left
-
-        0.6f,  0.5f, 0.0f,  // top right
-        -0.4f, -0.5f, 0.0f, // bottom left
-        0.6f, -0.5f, 0.0f,  // bottom right
+        -0.5f, 0.5f, 0.0f,  1.f,0.f,0.f, // top left 
+        0.5f, 0.5f, 0.0f,   0.f,1.f,0.f,  // top right
+        -0.5f, -0.5f, 0.0f, 0.f,0.f,1.f, // bottom left
+        0.5f, -0.5f, 0.0f,  0.f,0.f,0.f, // bottom right
     };
     unsigned int indices[] = {
         0, 1, 2,   // first triangle
+        1, 2, 3    // second triangle
     }; 
-    unsigned int indices2[] = {
-        3, 4, 5    // second triangle
-    }; 
+    float texCoords[] = {
+        0.0f, 0.0f,  // lower-left corner  
+        1.0f, 0.0f,  // lower-right corner
+        0.5f, 1.0f   // top-center corner
+    };
 
+    // Vertex array
     unsigned int VAO = load_vertex_array(sizeof(vertices), vertices, sizeof(indices), indices);
-    // Set our vertex attributes pointers
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    // Set our vertex attributes pointers (loc, num, type, norm?, stride, offset)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3*sizeof(float)));
     glEnableVertexAttribArray(0);  
+    glEnableVertexAttribArray(1);  
 
-    unsigned int VAO2 = load_vertex_array(sizeof(vertices), vertices, sizeof(indices2), indices2);
-    // Set our vertex attributes pointers
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);  
+    // Textures
+    // (paramétrage)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    unsigned int container = load_texture("assets/container.jpg");
+    
 
     // Mainloop
     while (!glfwWindowShouldClose(window)) {
@@ -95,12 +87,10 @@ int main() {
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         
-        glUseProgram(program);
-        glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
-        glUseProgram(program2);
-        glBindVertexArray(VAO2);
-        glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
+        // draw
+        program.set_float("time", (float)glfwGetTime());
+        program.use();
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         
         // des trucs
         glfwSwapBuffers(window);

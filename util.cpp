@@ -1,9 +1,43 @@
+#ifndef FILE_UTIL
+#define FILE_UTIL
+
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 using namespace std; 
 
 int success; char info_log[512];
+
+// -1. Definitions
+typedef unsigned int uint;
+typedef unsigned char uchar;
+
+// 0. UTIL
+string read_file(string path) {
+    string content;
+    ifstream file;
+    stringstream stream;
+    // ensure ifstream objects can throw exceptions
+    file.exceptions(ifstream::failbit | ifstream::badbit);
+    try {
+        // open file
+        file.open(path);
+        // read file's buffer contents into streams
+        stream << file.rdbuf();
+        // close file handlers
+        file.close();
+        // convert stream into string
+        content = stream.str();
+    }
+    catch (ifstream::failure& e) {
+        cout << "ERROR SHADER FILE READ (" << path << "): " << e.what() << endl;
+    }
+    return content;
+}
 
 
 // I. SHADERS
@@ -45,12 +79,38 @@ unsigned int load_shader_program(const char* vert_source, const char* frag_sourc
     return program;
 }
 
+class Program { public:
+    unsigned int ID;
+
+    Program(string vert_path, string frag_path) {
+        const char* vert_code = read_file(vert_path).c_str();
+        const char* frag_code =  read_file(frag_path).c_str();
+        ID = load_shader_program(vert_code, frag_code);
+    }
+
+    void use() {
+        glUseProgram(ID); 
+    }
+    // utility uniform functions
+    // ------------------------------------------------------------------------
+    void set_bool(const string &name, bool value) const{        
+        glUniform1i(glGetUniformLocation(ID, name.c_str()), (int)value); 
+    }
+    // ------------------------------------------------------------------------
+    void set_int(const string &name, int value) const{
+        glUniform1i(glGetUniformLocation(ID, name.c_str()), value); 
+    }
+    // ------------------------------------------------------------------------
+    void set_float(const string &name, float value) const{
+        glUniform1f(glGetUniformLocation(ID, name.c_str()), value); 
+    }
+};
+
 // II. BUFFERS
 unsigned int load_vertex_array(unsigned int vertices_num, float* vertices, unsigned int indices_num, unsigned int* indices) {
     // Buffers (Vertex, element)
     unsigned int VBO, EBO;
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
+    glGenBuffers(2, (&VBO, &EBO));
 
     // Vertex array
     unsigned int VAO;
@@ -63,3 +123,21 @@ unsigned int load_vertex_array(unsigned int vertices_num, float* vertices, unsig
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_num, indices, GL_STATIC_DRAW);
     return VAO;
 }
+
+
+// III. Textures
+unsigned int load_texture(const char* path) {
+    int width, height, num_channels;
+    unsigned char *data = stbi_load(path, &width, &height, &num_channels, 0);
+
+    unsigned int texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    
+    stbi_image_free(data);
+    return texture;
+}
+
+#endif
