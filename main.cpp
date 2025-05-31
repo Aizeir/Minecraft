@@ -76,26 +76,24 @@ int main() {
     // Fenêtre
     GLFWwindow* window = setup();
 
-    // Shader
-    Program program = Program("shaders/triangle.vert", "shaders/triangle.frag");
-
-    // Vertex array
-    unsigned int VAO = cube_vao();
-    // Set our vertex attributes pointers (loc, num, type, norm?, stride, offset)
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3*sizeof(float)));
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
+    // Shaders
+    Program program("shaders/default.vert", "shaders/default.frag");
+    Program light_shader("shaders/default.vert", "shaders/light.frag");
 
     // Textures
     unsigned int container = load_texture("assets/container.jpg"); uint container_unit = 0;
     unsigned int brick = load_texture("assets/awesomeface.png", GL_RGBA); uint brick_unit = 1;
     program.use();
-    program.set_int("image", container_unit);
-    program.set_int("image2", brick_unit);
+    // program.set_int("image", container_unit);
+    // program.set_int("image2", brick_unit);
 
-    // Objets
-    vec3 cubePositions[] = {
+    // Objects
+    unsigned int VBO, EBO = cube_buffers();
+    unsigned int VAO = cube_vao_with_attribs(VBO, EBO);
+    unsigned int lightVAO = cube_vao_with_attribs(VBO, EBO);
+
+    // Cubes
+    vec3 cube_positions[] = {
         vec3( 0.0f,  0.0f,  0.0f), 
         vec3( 2.0f,  5.0f, -15.0f), 
         vec3(-1.5f, -2.2f, -2.5f),  
@@ -107,8 +105,9 @@ int main() {
         vec3( 1.5f,  0.2f, -1.5f), 
         vec3(-1.3f,  1.0f, -1.5f)  
     };
+    vec3 light_pos(1.2f, 1.0f, 2.0f);
 
-    glm::mat4 projection = glm::perspective(rad(60.0f), (float)W / (float)H, 0.1f, 100.0f);
+    mat4 projection = glm::perspective(rad(60.0f), (float)W / (float)H, 0.1f, 100.0f);
 
     // Mainloop
     while (!glfwWindowShouldClose(window)) {
@@ -122,24 +121,36 @@ int main() {
         camera.update();
         
         // draw
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
-        glBindVertexArray(VAO); 
-        bind_texture(container, container_unit);
-        bind_texture(brick, brick_unit);
+        // Cube
+        glBindVertexArray(VAO);
         program.use();
-        
-        for (uint i = 0; i<10; ++i) {
-            glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, cubePositions[i]);
-            float angle = 20.0f * i;
-            if (i%3==0) angle += (float)glfwGetTime()*5.f;
-            model = glm::rotate(model, rad(angle), vec3(1.0f, 0.3f, 0.5f));
+        program.set_vec3("color", vec3(1.0f, 0.5f, 0.31f));
+        program.set_vec3("light_color", vec3(1.0f, 1.0f, 1.0f));
+        program.set_vec3("light_pos", light_pos);
+        program.set_vec3("camera_pos", camera.pos);
 
-            program.set_mat4("transform", projection * camera.view * model);
-            glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-        }
+        mat4 model(1.0f);
+        model = glm::rotate(model, (float)glfwGetTime() / 2.f, up);
+        program.set_mat4("model", model);
+        program.set_mat3("normal_mat", glm::mat3(glm::transpose(glm::inverse(model))));
+        program.set_mat4("transform", projection * camera.view);
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+
+        // Light
+        glBindVertexArray(lightVAO);
+        light_shader.use();
+        light_shader.set_vec3("light_color", vec3(1.0f, 1.0f, 1.0f));
+
+        model = mat4(1.0f);
+        model = glm::translate(model, light_pos);
+        model = glm::scale(model, vec3(0.2f));
+        light_shader.set_mat4("model", model);
+        light_shader.set_mat4("transform", projection * camera.view);
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+
         // des trucs
         glfwSwapBuffers(window);
         glfwPollEvents();

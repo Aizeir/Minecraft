@@ -129,31 +129,161 @@ class Program { public:
         glUniform1f(glGetUniformLocation(ID, name.c_str()), value); 
     }
     // ------------------------------------------------------------------------
+    void set_vec3(const string &name, glm::vec3 vec) const{
+        glUniform3f(glGetUniformLocation(ID, name.c_str()), vec.x, vec.y, vec.z);
+    }
+    void set_vec4(const string &name, glm::vec4 vec) const{
+        glUniform4f(glGetUniformLocation(ID, name.c_str()), vec.x, vec.y, vec.z, vec.w);
+    }
+    // ------------------------------------------------------------------------
     void set_mat4(const string &name, glm::mat4 mat) const{
         glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, glm::value_ptr(mat));
     }
+    void set_mat3(const string &name, glm::mat3 mat) const{
+        glUniformMatrix3fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, glm::value_ptr(mat));
+    }
 };
 
-// II. BUFFERS
-unsigned int load_vertex_array(unsigned int vertices_num, const float* vertices, unsigned int indices_num, const unsigned int* indices) {
-    // Buffers (Vertex, element)
-    unsigned int VBO, EBO;
-    glGenBuffers(2, (&VBO, &EBO));
 
-    // Vertex array
-    unsigned int VAO;
-    glGenVertexArrays(1, &VAO);
-    glBindVertexArray(VAO);
+// II. Cube vertices
+// float cube_vertices[] = {
+//     // Positions           // UVs
+//     // Back face
+//     -0.5f, -0.5f, -0.5f,   0.0f, 0.0f,
+//      0.5f, -0.5f, -0.5f,   1.0f, 0.0f,
+//      0.5f,  0.5f, -0.5f,   1.0f, 1.0f,
+//     -0.5f,  0.5f, -0.5f,   0.0f, 1.0f,
+//     // Front face
+//     -0.5f, -0.5f,  0.5f,   0.0f, 0.0f,
+//      0.5f, -0.5f,  0.5f,   1.0f, 0.0f,
+//      0.5f,  0.5f,  0.5f,   1.0f, 1.0f,
+//     -0.5f,  0.5f,  0.5f,   0.0f, 1.0f,
+//     // Left face
+//     -0.5f, -0.5f, -0.5f,   0.0f, 0.0f,
+//     -0.5f, -0.5f,  0.5f,   1.0f, 0.0f,
+//     -0.5f,  0.5f,  0.5f,   1.0f, 1.0f,
+//     -0.5f,  0.5f, -0.5f,   0.0f, 1.0f,
+//     // Right face
+//      0.5f, -0.5f, -0.5f,   0.0f, 0.0f,
+//      0.5f, -0.5f,  0.5f,   1.0f, 0.0f,
+//      0.5f,  0.5f,  0.5f,   1.0f, 1.0f,
+//      0.5f,  0.5f, -0.5f,   0.0f, 1.0f,
+//     // Bottom face
+//     -0.5f, -0.5f, -0.5f,   0.0f, 1.0f,
+//      0.5f, -0.5f, -0.5f,   1.0f, 1.0f,
+//      0.5f, -0.5f,  0.5f,   1.0f, 0.0f,
+//     -0.5f, -0.5f,  0.5f,   0.0f, 0.0f,
+//     // Top face
+//     -0.5f,  0.5f, -0.5f,   0.0f, 1.0f,
+//      0.5f,  0.5f, -0.5f,   1.0f, 1.0f,
+//      0.5f,  0.5f,  0.5f,   1.0f, 0.0f,
+//     -0.5f,  0.5f,  0.5f,   0.0f, 0.0f,
+// };
+// unsigned int cube_indices[] = {
+//     // Back face
+//     0, 1, 2,
+//     2, 3, 0,
+//     // Front face
+//     4, 5, 6,
+//     6, 7, 4,
+//     // Left face
+//     8, 9,10,
+//    10,11, 8,
+//     // Right face
+//    12,13,14,
+//    14,15,12,
+//     // Bottom face
+//    16,17,18,
+//    18,19,16,
+//     // Top face
+//    20,21,22,
+//    22,23,20
+// };
+
+float cube_vertices[] = {
+    -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+     0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 
+     0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 
+     0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 
+    -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 
+    -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f, 
+
+    -0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
+     0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
+     0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
+     0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
+    -0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
+
+    -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+    -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+    -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+    -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+    -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+    -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+
+     0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+     0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+     0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+     0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+     0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+     0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+
+    -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+     0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+     0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+     0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+
+    -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+     0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+     0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+     0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+    -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+    -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
+};
+
+unsigned int cube_indices[36] = {
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+    12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+    24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35
+};
+
+// II. BUFFERS and VAO
+unsigned int load_vertex_buffers(unsigned int vertices_num, const float* vertices, unsigned int indices_num, const unsigned int* indices) {
+    // Buffers (Vertex, element)
+    unsigned int VBO, EBO; glGenBuffers(2, (&VBO, &EBO));
     // Copy our vertices array in a buffer for OpenGL to use
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, vertices_num, vertices, GL_STATIC_DRAW);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_num, indices, GL_STATIC_DRAW);
+    return VBO, EBO;
+}
+
+unsigned int cube_buffers() {
+    return load_vertex_buffers(sizeof(cube_vertices), cube_vertices, sizeof(cube_indices), cube_indices);
+}
+
+unsigned int load_vertex_array(unsigned int VBO, unsigned int EBO) {
+    // Vertex array
+    unsigned int VAO; glGenVertexArrays(1, &VAO);
+    glBindVertexArray(VAO);
+    // Bind buffers
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     return VAO;
 }
 
-unsigned int cube_vao() {
-    return load_vertex_array(sizeof(vertices), vertices, sizeof(indices), indices);
+unsigned int cube_vao_with_attribs(unsigned int VBO, unsigned int EBO) {
+    unsigned int vao = load_vertex_array(VBO, EBO);
+    // Vertex shader attributes (positions, uvs)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3*sizeof(float)));
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    return vao;
 }
 
 // III. Textures
@@ -175,62 +305,6 @@ void bind_texture(uint texture, uint unit) {
     glActiveTexture(GL_TEXTURE0 + unit);
     glBindTexture(GL_TEXTURE_2D, texture);
 }
-
-// IV. Vertex
-float vertices[] = {
-    // Positions           // UVs
-    // Back face
-    -0.5f, -0.5f, -0.5f,   0.0f, 0.0f,
-     0.5f, -0.5f, -0.5f,   1.0f, 0.0f,
-     0.5f,  0.5f, -0.5f,   1.0f, 1.0f,
-    -0.5f,  0.5f, -0.5f,   0.0f, 1.0f,
-    // Front face
-    -0.5f, -0.5f,  0.5f,   0.0f, 0.0f,
-     0.5f, -0.5f,  0.5f,   1.0f, 0.0f,
-     0.5f,  0.5f,  0.5f,   1.0f, 1.0f,
-    -0.5f,  0.5f,  0.5f,   0.0f, 1.0f,
-    // Left face
-    -0.5f, -0.5f, -0.5f,   0.0f, 0.0f,
-    -0.5f, -0.5f,  0.5f,   1.0f, 0.0f,
-    -0.5f,  0.5f,  0.5f,   1.0f, 1.0f,
-    -0.5f,  0.5f, -0.5f,   0.0f, 1.0f,
-    // Right face
-     0.5f, -0.5f, -0.5f,   0.0f, 0.0f,
-     0.5f, -0.5f,  0.5f,   1.0f, 0.0f,
-     0.5f,  0.5f,  0.5f,   1.0f, 1.0f,
-     0.5f,  0.5f, -0.5f,   0.0f, 1.0f,
-    // Bottom face
-    -0.5f, -0.5f, -0.5f,   0.0f, 1.0f,
-     0.5f, -0.5f, -0.5f,   1.0f, 1.0f,
-     0.5f, -0.5f,  0.5f,   1.0f, 0.0f,
-    -0.5f, -0.5f,  0.5f,   0.0f, 0.0f,
-    // Top face
-    -0.5f,  0.5f, -0.5f,   0.0f, 1.0f,
-     0.5f,  0.5f, -0.5f,   1.0f, 1.0f,
-     0.5f,  0.5f,  0.5f,   1.0f, 0.0f,
-    -0.5f,  0.5f,  0.5f,   0.0f, 0.0f,
-};
-unsigned int indices[] = {
-    // Back face
-    0, 1, 2,
-    2, 3, 0,
-    // Front face
-    4, 5, 6,
-    6, 7, 4,
-    // Left face
-    8, 9,10,
-   10,11, 8,
-    // Right face
-   12,13,14,
-   14,15,12,
-    // Bottom face
-   16,17,18,
-   18,19,16,
-    // Top face
-   20,21,22,
-   22,23,20
-};
-
 
 
 #endif
