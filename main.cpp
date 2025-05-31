@@ -135,10 +135,14 @@ int main() {
         program.set_int("material.specular", cont_spec_unit);
         program.set_float("material.shininess", 32.0f);
 
-        program.set_vec4("light.vector", vec4(-0.2f, -1.0f, -0.3f, 0.0f));
+        //program.set_vec4("light.vector", vec4(-0.2f, -1.0f, -0.3f, 0.0f));
+        program.set_vec4("light.vector", vec4(light_pos, 1.0f));
         program.set_vec3("light.ambient",  vec3(0.2f, 0.2f, 0.2f));
         program.set_vec3("light.diffuse",  vec3(0.5f, 0.5f, 0.5f)); // darken diffuse light a bit
         program.set_vec3("light.specular", vec3(1.0f, 1.0f, 1.0f)); 
+        program.set_float("light.constant",  1.0f);
+        program.set_float("light.linear",    0.09f);
+        program.set_float("light.quadratic", 0.032f);	
         
         program.set_mat4("transform", projection * camera.view);
 
