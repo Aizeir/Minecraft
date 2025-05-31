@@ -65,8 +65,8 @@ GLFWwindow* setup() {
     // Paramétrage de toutes les textures
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     stbi_set_flip_vertically_on_load(true);
 
     return window;
@@ -81,7 +81,9 @@ int main() {
     Program light_shader("shaders/default.vert", "shaders/light.frag");
 
     // Textures
-    unsigned int container = load_texture("assets/container2.png"); uint container_unit = 0;
+    unsigned int container = load_texture("assets/container2.png", GL_RGBA); uint container_unit = 0;
+    unsigned int container_spec = load_texture("assets/container2_specular.png", GL_RGBA); uint cont_spec_unit = 1;
+    unsigned int matrix = load_texture("assets/matrix.jpg", GL_RGB); uint mat_unit = 2;
     program.use();
 
     // Objects
@@ -126,22 +128,31 @@ int main() {
         program.use();
         program.set_vec3("camera_pos", camera.pos);
 
-        bind_texture(container_unit, container);
+        bind_texture(container, container_unit);
+        bind_texture(container_spec, cont_spec_unit);
+        bind_texture(matrix, mat_unit);
         program.set_int("material.diffuse", container_unit);
-        program.set_vec3("material.specular", vec3(0.5f, 0.5f, 0.5f));
+        program.set_int("material.specular", cont_spec_unit);
         program.set_float("material.shininess", 32.0f);
 
-        program.set_vec3("light.pos", light_pos);
+        program.set_vec4("light.vector", vec4(-0.2f, -1.0f, -0.3f, 0.0f));
         program.set_vec3("light.ambient",  vec3(0.2f, 0.2f, 0.2f));
         program.set_vec3("light.diffuse",  vec3(0.5f, 0.5f, 0.5f)); // darken diffuse light a bit
         program.set_vec3("light.specular", vec3(1.0f, 1.0f, 1.0f)); 
-
-        mat4 model(1.0f);
-        program.set_mat4("model", model);
-        program.set_mat3("normal_mat", glm::mat3(glm::transpose(glm::inverse(model))));
+        
         program.set_mat4("transform", projection * camera.view);
-        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 
+        mat4 model;
+        for (unsigned int i = 0; i < 10; i++) {
+            model = mat4(1.0f);
+            model = glm::translate(model, cube_positions[i]);
+            model = glm::rotate(model, rad(20.0f*i), glm::vec3(1.0f, 0.3f, 0.5f));
+                
+            program.set_mat4("model", model);
+            program.set_mat3("normal_mat", glm::mat3(glm::transpose(glm::inverse(model))));
+            glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+        }
+  
         // Light
         glBindVertexArray(lightVAO);
         light_shader.use();
