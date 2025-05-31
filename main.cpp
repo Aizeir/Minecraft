@@ -81,11 +81,8 @@ int main() {
     Program light_shader("shaders/default.vert", "shaders/light.frag");
 
     // Textures
-    unsigned int container = load_texture("assets/container.jpg"); uint container_unit = 0;
-    unsigned int brick = load_texture("assets/awesomeface.png", GL_RGBA); uint brick_unit = 1;
+    unsigned int container = load_texture("assets/container2.png"); uint container_unit = 0;
     program.use();
-    // program.set_int("image", container_unit);
-    // program.set_int("image2", brick_unit);
 
     // Objects
     unsigned int VBO, EBO = cube_buffers();
@@ -127,10 +124,17 @@ int main() {
         // Cube
         glBindVertexArray(VAO);
         program.use();
-        program.set_vec3("color", vec3(1.0f, 0.5f, 0.31f));
-        program.set_vec3("light_color", vec3(1.0f, 1.0f, 1.0f));
-        program.set_vec3("light_pos", light_pos);
         program.set_vec3("camera_pos", camera.pos);
+
+        bind_texture(container_unit, container);
+        program.set_int("material.diffuse", container_unit);
+        program.set_vec3("material.specular", vec3(0.5f, 0.5f, 0.5f));
+        program.set_float("material.shininess", 32.0f);
+
+        program.set_vec3("light.pos", light_pos);
+        program.set_vec3("light.ambient",  vec3(0.2f, 0.2f, 0.2f));
+        program.set_vec3("light.diffuse",  vec3(0.5f, 0.5f, 0.5f)); // darken diffuse light a bit
+        program.set_vec3("light.specular", vec3(1.0f, 1.0f, 1.0f)); 
 
         mat4 model(1.0f);
         program.set_mat4("model", model);
@@ -142,7 +146,7 @@ int main() {
         glBindVertexArray(lightVAO);
         light_shader.use();
         light_shader.set_vec3("light_color", vec3(1.0f, 1.0f, 1.0f));
-        light_pos = vec3(1.2f * sin((float)glfwGetTime()), 1.0f, 2.0f * cos((float)glfwGetTime()));
+        
         model = mat4(1.0f);
         model = glm::translate(model, light_pos);
         model = glm::scale(model, vec3(0.2f));
