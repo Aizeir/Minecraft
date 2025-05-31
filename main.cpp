@@ -104,7 +104,12 @@ int main() {
         vec3( 1.5f,  0.2f, -1.5f), 
         vec3(-1.3f,  1.0f, -1.5f)  
     };
-    vec3 light_pos(1.2f, 1.0f, 2.0f);
+    vec3 light_positions[] = {
+        vec3( 0.7f,  0.2f,  2.0f),
+        vec3( 2.3f, -3.3f, -4.0f),
+        vec3(-4.0f,  2.0f, -12.0f),
+        vec3( 0.0f,  0.0f, -3.0f)
+    };
 
     mat4 projection = glm::perspective(rad(60.0f), (float)W / (float)H, 0.1f, 100.0f);
 
@@ -135,22 +140,40 @@ int main() {
         program.set_int("material.specular", cont_spec_unit);
         program.set_float("material.shininess", 32.0f);
 
-        //program.set_vec4("light.vector", vec4(-0.2f, -1.0f, -0.3f, 0.0f));
-        program.set_vec4("light.vector", vec4(light_pos, 1.0f));
-        program.set_vec3("light.ambient",  vec3(0.2f, 0.2f, 0.2f));
-        program.set_vec3("light.diffuse",  vec3(0.5f, 0.5f, 0.5f)); // darken diffuse light a bit
-        program.set_vec3("light.specular", vec3(1.0f, 1.0f, 1.0f)); 
-        program.set_float("light.constant",  1.0f);
-        program.set_float("light.linear",    0.09f);
-        program.set_float("light.quadratic", 0.032f);	
+        program.set_vec3("dirlight.direction", vec3(-0.2f, -1.0f, -0.3f));
+        program.set_vec3("dirlight.ambient",  vec3(0.2f, 0.2f, 0.2f));
+        program.set_vec3("dirlight.diffuse",  vec3(0.5f, 0.5f, 0.5f)); // darken diffuse light a bit
+        program.set_vec3("dirlight.specular", vec3(1.0f, 1.0f, 1.0f)); 
         
+        for (uint i=0;i<4;i++) {
+            string name = "pointlights["+to_string(i)+"].";
+            program.set_vec3 (name+"position",  light_positions[i]);
+            program.set_vec3 (name+"ambient",   vec3(0.2f, 0.2f, 0.2f));
+            program.set_vec3 (name+"diffuse",   vec3(0.5f, 0.5f, 0.5f)); // darken diffuse light a bit
+            program.set_vec3 (name+"specular",  vec3(1.0f, 1.0f, 1.0f)); 
+            program.set_float(name+"constant",  1.0f);
+            program.set_float(name+"linear",    0.09f);
+            program.set_float(name+"quadratic", 0.032f);
+        }
+        
+        program.set_vec3("spotlight.position", camera.pos);
+        program.set_vec3("spotlight.direction", camera.front);
+        program.set_vec3("spotlight.ambient",  vec3(0.2f, 0.2f, 0.2f));
+        program.set_vec3("spotlight.diffuse",  vec3(0.5f, 0.5f, 0.5f)); // darken diffuse light a bit
+        program.set_vec3("spotlight.specular", vec3(1.0f, 1.0f, 1.0f)); 
+        program.set_float("spotlight.constant",  1.0f);
+        program.set_float("spotlight.linear",    0.09f);
+        program.set_float("spotlight.quadratic", 0.032f);
+        program.set_float("spotlight.cutoff", glm::cos(rad(12.5f)));
+        program.set_float("spotlight.outer_cutoff", glm::cos(rad(17.5f)));
+                
         program.set_mat4("transform", projection * camera.view);
 
         mat4 model;
         for (unsigned int i = 0; i < 10; i++) {
             model = mat4(1.0f);
             model = glm::translate(model, cube_positions[i]);
-            model = glm::rotate(model, rad(20.0f*i), glm::vec3(1.0f, 0.3f, 0.5f));
+            model = glm::rotate(model, rad(20.0f*i), vec3(1.0f, 0.3f, 0.5f));
                 
             program.set_mat4("model", model);
             program.set_mat3("normal_mat", glm::mat3(glm::transpose(glm::inverse(model))));
@@ -162,12 +185,14 @@ int main() {
         light_shader.use();
         light_shader.set_vec3("light_color", vec3(1.0f, 1.0f, 1.0f));
         
-        model = mat4(1.0f);
-        model = glm::translate(model, light_pos);
-        model = glm::scale(model, vec3(0.2f));
-        light_shader.set_mat4("model", model);
-        light_shader.set_mat4("transform", projection * camera.view);
-        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+        for (uint i=0;i<4;i++) {
+            model = mat4(1.0f);
+            model = glm::translate(model, light_positions[i]);
+            model = glm::scale(model, vec3(0.2f));
+            light_shader.set_mat4("model", model);
+            light_shader.set_mat4("transform", projection * camera.view);
+            glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+        }
 
         // des trucs
         glfwSwapBuffers(window);
