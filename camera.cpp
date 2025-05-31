@@ -7,7 +7,7 @@ mat4 look_at(vec3 pos, vec3 target, vec3 fixed) {
     vec3 D = pos-target;
     mat4 camera_basis = mat4(
         glm::normalize(vec4(glm::cross(fixed, D), 0.0f)), // droite
-        glm::normalize(vec4(fixed, 0.0f)), // haut
+        glm::normalize(vec4(glm::cross(D, glm::cross(fixed, D)), 0.0f)), // haut
         glm::normalize(vec4(D, 0.0f)), // direction (opposé, pour sens direct)
         vec4(0.f, 0.f, 0.f, 1.f)
     );

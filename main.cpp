@@ -62,6 +62,13 @@ GLFWwindow* setup() {
     });
     glEnable(GL_DEPTH_TEST);
 
+    // Paramétrage de toutes les textures
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    stbi_set_flip_vertically_on_load(true);
+
     return window;
 }
 
@@ -72,75 +79,17 @@ int main() {
     // Shader
     Program program = Program("shaders/triangle.vert", "shaders/triangle.frag");
 
-    // Données des "primitives"
-    float vertices[] = {
-        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-        0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
-        0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-        0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-        0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-        0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-        0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-        -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-
-        -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-        -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-        -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-
-        0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-        0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-        0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-        0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-        0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-        0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-        0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
-        0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-        0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-
-        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-        0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-        0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-        0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-        -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
-        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
-    };
-
-    uint indices[36];
-    for (uint i = 0; i < 36; i++) indices[i] = i;
-    
     // Vertex array
-    unsigned int VAO = load_vertex_array(sizeof(vertices), vertices, sizeof(indices), indices);
+    unsigned int VAO = cube_vao();
     // Set our vertex attributes pointers (loc, num, type, norm?, stride, offset)
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3*sizeof(float)));
-    glEnableVertexAttribArray(0);  
-    glEnableVertexAttribArray(1);  
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
 
     // Textures
-    // (paramétrage)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    stbi_set_flip_vertically_on_load(true);
-
-    // images
-    unsigned int container = load_texture("assets/container.jpg");
-    uint container_unit = 0;
-    unsigned int brick = load_texture("assets/awesomeface.png", GL_RGBA);
-    uint brick_unit = 1;
+    unsigned int container = load_texture("assets/container.jpg"); uint container_unit = 0;
+    unsigned int brick = load_texture("assets/awesomeface.png", GL_RGBA); uint brick_unit = 1;
     program.use();
     program.set_int("image", container_unit);
     program.set_int("image2", brick_unit);
@@ -187,8 +136,8 @@ int main() {
             float angle = 20.0f * i;
             if (i%3==0) angle += (float)glfwGetTime()*5.f;
             model = glm::rotate(model, rad(angle), vec3(1.0f, 0.3f, 0.5f));
+
             program.set_mat4("transform", projection * camera.view * model);
-            
             glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
         }
         // des trucs
