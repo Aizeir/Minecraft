@@ -133,7 +133,6 @@ int main() {
         program.set_vec3("camera_pos", camera.pos);
 
         mat4 model(1.0f);
-        model = glm::rotate(model, (float)glfwGetTime() / 2.f, up);
         program.set_mat4("model", model);
         program.set_mat3("normal_mat", glm::mat3(glm::transpose(glm::inverse(model))));
         program.set_mat4("transform", projection * camera.view);
@@ -143,7 +142,7 @@ int main() {
         glBindVertexArray(lightVAO);
         light_shader.use();
         light_shader.set_vec3("light_color", vec3(1.0f, 1.0f, 1.0f));
-
+        light_pos = vec3(1.2f * sin((float)glfwGetTime()), 1.0f, 2.0f * cos((float)glfwGetTime()));
         model = mat4(1.0f);
         model = glm::translate(model, light_pos);
         model = glm::scale(model, vec3(0.2f));
