@@ -59,6 +59,8 @@ uniform DirLight dirlight;
 uniform PointLight pointlights[4];
 uniform SpotLight spotlight;
 
+uniform int outline;
+
 
 // PHONG
 vec3 calc_ambient(vec3 light_ambient, vec3 diffuse_map, float attenuation=0.0) {
@@ -72,10 +74,10 @@ vec3 calc_diffuse(vec3 light_dir, vec3 light_diffuse, vec3 diffuse_map, float at
 
 vec3 calc_specular(vec3 light_dir, vec3 light_specular, float attenuation=0.0) {
     vec3 view_dir = normalize(camera_pos - frag_pos); // towards CAMERA
-    vec3 reflect_dir = reflect(-light_dir, normal);
+    vec3 halfway_dir = normalize(light_dir + view_dir);
 
     vec3 specular_map = texture2D(material.specular, uvs).rgb;
-    float specular_value = pow(max(dot(view_dir, reflect_dir), 0.0), material.shininess);
+    float specular_value = pow(max(dot(normal, halfway_dir), 0.0), material.shininess);
     return light_specular * (specular_value * specular_map * attenuation);
 }
 
@@ -135,6 +137,11 @@ vec3 calc_spotlight(SpotLight light) {
 
 
 void main() {
+    if (outline == 1) {
+        FragColor = vec4(1.0,1.0,1.0,1.0);
+        return;
+    }
+
     vec3 color;
     color = calc_dirlight(dirlight);
     for (int i=0;i<4;i++) {

@@ -1,3 +1,4 @@
+#pragma once
 #include "util.cpp"
 #include "camera.cpp"
 
