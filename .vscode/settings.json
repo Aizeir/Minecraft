@@ -55,6 +55,10 @@
         "sstream": "cpp",
         "string": "cpp",
         "functional": "cpp",
-        "list": "cpp"
+        "list": "cpp",
+        "cstdarg": "cpp",
+        "iomanip": "cpp",
+        "unordered_map": "cpp",
+        "xhash": "cpp"
     }
 }
