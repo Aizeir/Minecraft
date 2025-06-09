@@ -9,7 +9,7 @@ bool is_first_mouse_pos = true;
 vec2 last_mouse_pos;
 
 Camera camera = Camera();
-World world = World();
+World world = World(camera.pos);
 
 void input(GLFWwindow *w, Camera& camera) {
     // Wireframe mode
@@ -51,7 +51,7 @@ void mouse_callback(GLFWwindow* window, double mouse_x, double mouse_y) {
 // Fonction appelée à chaque clic
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && camera.selecting) {
-        world.break_block(camera.selection);
+        world.set_block(camera.selection, -1);
     }
 }
 
@@ -78,8 +78,7 @@ GLFWwindow* setup() {
         glViewport(0, 0, width, height);
     });
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-
+    //glEnable(GL_CULL_FACE);
     return window;
 }
 
@@ -95,9 +94,26 @@ int main() {
     unsigned int atlas = load_texture("assets/atlas.png", GL_RGBA); uint atlas_unit = 0;
     bind_texture(atlas, atlas_unit);
 
+    // Buffers (Vertex, element)
+    unsigned int VBO, EBO; glGenBuffers(2, (&VBO, &EBO));
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+
     // Vertex array
-    unsigned int VBO, EBO = cube_buffers();
-    unsigned int VAO = cube_vao_with_attribs(VBO, EBO);
+    unsigned int VAO; glGenVertexArrays(1, &VAO);
+    glBindVertexArray(VAO);
+    // - Position
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, pos));
+    glEnableVertexAttribArray(0);
+    // - Normal
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
+    glEnableVertexAttribArray(1);
+    // - UV
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, uv));
+    glEnableVertexAttribArray(2);
+    // - Block ID
+    glVertexAttribIPointer(3, 1, GL_INT, sizeof(Vertex), (void*)offsetof(Vertex, id));
+    glEnableVertexAttribArray(3);
 
     // Projection
     mat4 projection = glm::perspective(rad(60.0f), (float)W / (float)H, 0.1f, 100.0f);
@@ -119,8 +135,7 @@ int main() {
         glClearColor(0.5f, 0.7f, 0.9f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // Cube
-        glBindVertexArray(VAO);
+        // Uniforms
         program.use();
         program.set_vec3("camera_pos", camera.pos);
 
@@ -146,27 +161,61 @@ int main() {
                 
         program.set_mat4("transform", projection * camera.view);
 
-        for (uint x=0;x<MAPW;x++) {
-        for (uint z=0;z<MAPD;z++) {
-        for (uint y=0;y<MAPH;y++) {
-            // block id
-            int id = world.map[x][z][y];
+        // Chunks
+        ivec2 c = get_chunk_pos(camera.pos);
+        for (int cx = c.x-LOAD; cx <= c.x + LOAD; cx++) {
+        for (int cz = c.y-LOAD; cz <= c.y + LOAD; cz++) {
+            // Loading chunks
+            Chunk* chunk = world.get_chunk(cx,cz);
+            if (chunk == nullptr) {
+                chunk = world.load_chunk(cx,cz);
+            }
+
+            // Génération des vertices
+            vector<Vertex> vertices;
+            vector<int> indices;
+
+            // Parcourir tous les blocs
+            for (int x=0;x<CHUNK_W;x++) {
+            for (int y=0;y<CHUNK_H;y++) {
+            for (int z=0;z<CHUNK_D;z++) {
+
+            // Block ID
+            ivec3 block(cx*CHUNK_W+x, y, cz*CHUNK_D+z);
+            int id = chunk->get_local_block(x,y,z);
             if (id == -1) continue;
-            program.set_int("block.id", id);
-            program.set_int("tex_coord_x", id%4);
-            program.set_int("tex_coord_y", 3 - id/4);
 
-            // hover
-            program.set_int("hover", (x==camera.selection.x && y == camera.selection.y && z == camera.selection.z));
+            // Matrices
+            mat4 model = glm::translate(mat4(1.0f), (vec3)block);
+            mat3 normal_mat = glm::mat3(glm::transpose(glm::inverse(model)));
 
-            // compute object's transform
-            vec3 position(x,y,z);
-            mat4 model = glm::translate(mat4(1.0f), position);
-            // draw
-            program.set_mat4("model", model);
-            program.set_mat3("normal_mat", glm::mat3(glm::transpose(glm::inverse(model))));
-            glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-        }}}
+            // Blocs voisins
+            for (int face_idx=0; face_idx<6; face_idx++) {
+                // Face visible
+                if (!world.is_solid(block + IDIRS[face_idx])) {
+                    // Copier une face au vertices/indices
+                    for (int vert_idx=0;vert_idx<6;vert_idx++) {
+
+                        Vertex vertex = cube_faces[face_idx][vert_idx];
+                        vertex.pos = vec3(model * vec4(vertex.pos, 1.0f));
+                        vertex.normal = normalize(vec3(model * vec4(vertex.normal, 1.0f)));
+                        vertex.id = id;
+                        vertices.push_back(vertex);
+                        int last_index = indices.size() > 0 ? indices.back() : 0;
+                        indices.push_back(last_index + 1);
+                    }
+                }
+            }
+            }}}
+            glBindVertexArray(VAO);
+            // - Vertices
+            glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
+            // - Indices (-33% sommets)
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(int), indices.data(), GL_STATIC_DRAW);
+            // Draw final
+            glDrawArrays(GL_TRIANGLES, 0, vertices.size());
+            //glDrawElements(GL_TRIANGLES, vertices.size(), GL_UNSIGNED_INT, nullptr);
+        }}
 
         // des trucs
         glfwSwapBuffers(window);

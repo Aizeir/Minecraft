@@ -10,6 +10,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+#include <fmt/format.h>
 using namespace std; 
 
 int success; char info_log[512];
@@ -22,13 +23,30 @@ typedef glm::vec3 vec3;
 typedef glm::ivec2 ivec2;
 typedef glm::ivec3 ivec3;
 typedef glm::vec4 vec4;
+typedef glm::mat3 mat3;
 typedef glm::mat4 mat4;
 
-#define W 1280
-#define H 720
+const int W = 1280;
+const int H = 720;
 
 inline float  rad(float  deg) {return glm::radians(deg);}
 inline double rad(double deg) {return glm::radians(deg);}
+
+const ivec3 ILEFT  = ivec3(-1, 0, 0);
+const ivec3 IRIGHT = ivec3(1, 0, 0);
+const ivec3 IUP    = ivec3(0, 1, 0);
+const ivec3 IDOWN  = ivec3(0, -1, 0);
+const ivec3 IFRONT = ivec3(0, 0, -1);
+const ivec3 IBACK  = ivec3(0, 0, 1);
+const ivec3 IDIRS[6] = {ILEFT, IRIGHT, IUP, IDOWN, IFRONT, IBACK};
+
+const vec3 LEFT =  vec3(-1.0f, 0.0f, 0.0f); 
+const vec3 RIGHT = vec3(1.0f, 0.0f, 0.0f); 
+const vec3 UP =    vec3(0.0f, 1.0f, 0.0f); 
+const vec3 DOWN =  vec3(0.0f, -1.0f, 0.0f); 
+const vec3 FRONT = vec3(0.0f, 0.0f, -1.0f); 
+const vec3 BACK =  vec3(0.0f, 0.0f, 1.0f);
+const vec3 DIRS[6] = {LEFT, RIGHT, UP, DOWN, FRONT, BACK};
 
 // 0. UTIL
 string read_file(string path) {
@@ -60,6 +78,18 @@ TYPENAME clamp(TYPENAME value, TYPENAME minVal, TYPENAME maxVal) {
     return value;
 }
 
+ostream& operator<<(ostream& os, const glm::ivec2& v) {
+    return os << "ivec2(" << v.x << ", " << v.y << ")";
+}
+ostream& operator<<(ostream& os, const glm::ivec3& v) {
+    return os << "ivec3(" << v.x << ", " << v.y << ", " << v.z << ")";
+}
+ostream& operator<<(ostream& os, const glm::vec2& v) {
+    return os << "vec2(" << v.x << ", " << v.y << ")";
+}
+ostream& operator<<(ostream& os, const glm::vec3& v) {
+    return os << "vec3(" << v.x << ", " << v.y << ", " << v.z << ")";
+}
 
 // I. SHADERS
 unsigned int load_shader(GLenum type, const char* source) {
@@ -149,154 +179,91 @@ class Program { public:
 
 
 // II. Cube vertices
-// float cube_vertices[] = {
-//     // Positions           // UVs
-//     // Back face
-//     -0.5f, -0.5f, -0.5f,   0.0f, 0.0f,
-//      0.5f, -0.5f, -0.5f,   1.0f, 0.0f,
-//      0.5f,  0.5f, -0.5f,   1.0f, 1.0f,
-//     -0.5f,  0.5f, -0.5f,   0.0f, 1.0f,
-//     // Front face
-//     -0.5f, -0.5f,  0.5f,   0.0f, 0.0f,
-//      0.5f, -0.5f,  0.5f,   1.0f, 0.0f,
-//      0.5f,  0.5f,  0.5f,   1.0f, 1.0f,
-//     -0.5f,  0.5f,  0.5f,   0.0f, 1.0f,
-//     // Left face
-//     -0.5f, -0.5f, -0.5f,   0.0f, 0.0f,
-//     -0.5f, -0.5f,  0.5f,   1.0f, 0.0f,
-//     -0.5f,  0.5f,  0.5f,   1.0f, 1.0f,
-//     -0.5f,  0.5f, -0.5f,   0.0f, 1.0f,
-//     // Right face
-//      0.5f, -0.5f, -0.5f,   0.0f, 0.0f,
-//      0.5f, -0.5f,  0.5f,   1.0f, 0.0f,
-//      0.5f,  0.5f,  0.5f,   1.0f, 1.0f,
-//      0.5f,  0.5f, -0.5f,   0.0f, 1.0f,
-//     // Bottom face
-//     -0.5f, -0.5f, -0.5f,   0.0f, 1.0f,
-//      0.5f, -0.5f, -0.5f,   1.0f, 1.0f,
-//      0.5f, -0.5f,  0.5f,   1.0f, 0.0f,
-//     -0.5f, -0.5f,  0.5f,   0.0f, 0.0f,
-//     // Top face
-//     -0.5f,  0.5f, -0.5f,   0.0f, 1.0f,
-//      0.5f,  0.5f, -0.5f,   1.0f, 1.0f,
-//      0.5f,  0.5f,  0.5f,   1.0f, 0.0f,
-//     -0.5f,  0.5f,  0.5f,   0.0f, 0.0f,
-// };
-// unsigned int cube_indices[] = {
-//     // Back face
-//     0, 1, 2,
-//     2, 3, 0,
-//     // Front face
-//     4, 5, 6,
-//     6, 7, 4,
-//     // Left face
-//     8, 9,10,
-//    10,11, 8,
-//     // Right face
-//    12,13,14,
-//    14,15,12,
-//     // Bottom face
-//    16,17,18,
-//    18,19,16,
-//     // Top face
-//    20,21,22,
-//    22,23,20
-// };
+struct Vertex {
+    vec3 pos;
+    vec3 normal;
+    vec2 uv;
+    int id = 0;
 
-float cube_vertices[] = {
-    // Back face
-     0.0f,  0.0f,  0.0f,  0.0f,  0.0f, -1.0f,  0.0f, 0.0f,
-     1.0f,  1.0f,  0.0f,  0.0f,  0.0f, -1.0f,  1.0f, 1.0f,
-     1.0f,  0.0f,  0.0f,  0.0f,  0.0f, -1.0f,  1.0f, 0.0f,
-     1.0f,  1.0f,  0.0f,  0.0f,  0.0f, -1.0f,  1.0f, 1.0f,
-     0.0f,  0.0f,  0.0f,  0.0f,  0.0f, -1.0f,  0.0f, 0.0f,
-     0.0f,  1.0f,  0.0f,  0.0f,  0.0f, -1.0f,  0.0f, 1.0f,
+    Vertex() = default;
+    Vertex(float x, float y, float z, float nx, float ny, float nz, float u, float v, int _id=0) :
+        pos(x,y,z), normal(nx,ny,nz), uv(u,v), id(_id) {};
+};
 
-    // Front face
-     0.0f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f, 0.0f,
-     1.0f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f,  1.0f, 0.0f,
-     1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f,  1.0f, 1.0f,
-     1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f,  1.0f, 1.0f,
-     0.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f, 1.0f,
-     0.0f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f, 0.0f,
+ostream& operator<<(ostream& os, const Vertex& v) {
+    return os << "Vertex " << v.pos
+              << "; " << v.normal
+              << "; " << v.uv
+              << "; " << v.id;
+}
 
+const int VERTEX_PER_FACE = 6;
+Vertex cube_faces[6][VERTEX_PER_FACE] = {
     // Left face
-     0.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
-     0.0f,  1.0f,  0.0f, -1.0f,  0.0f,  0.0f,  1.0f, 1.0f,
-     0.0f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
-     0.0f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
-     0.0f,  0.0f,  1.0f, -1.0f,  0.0f,  0.0f,  0.0f, 0.0f,
-     0.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
-
+    {
+        {0.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f},
+        {0.0f,  1.0f,  0.0f, -1.0f,  0.0f,  0.0f,  1.0f, 1.0f},
+        {0.0f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f},
+        {0.0f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f},
+        {0.0f,  0.0f,  1.0f, -1.0f,  0.0f,  0.0f,  0.0f, 0.0f},
+        {0.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f}
+    },
     // Right face
-     1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
-     1.0f,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
-     1.0f,  1.0f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f,
-     1.0f,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f,
-     1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f,
-     1.0f,  0.0f,  1.0f,  1.0f,  0.0f,  0.0f,  0.0f, 0.0f,
-
-    // Bottom face
-     0.0f,  0.0f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f, 1.0f,
-     1.0f,  0.0f,  0.0f,  0.0f, -1.0f,  0.0f,  1.0f, 1.0f,
-     1.0f,  0.0f,  1.0f,  0.0f, -1.0f,  0.0f,  1.0f, 0.0f,
-     1.0f,  0.0f,  1.0f,  0.0f, -1.0f,  0.0f,  1.0f, 0.0f,
-     0.0f,  0.0f,  1.0f,  0.0f, -1.0f,  0.0f,  0.0f, 0.0f,
-     0.0f,  0.0f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f, 1.0f,
-
-    // Top face
-     0.0f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f, 1.0f,
-     1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f,  1.0f, 0.0f,
-     1.0f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f,  1.0f, 1.0f,
-     1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f,  1.0f, 0.0f,
-     0.0f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f, 1.0f,
-     0.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f,  0.0f, 0.0f
+    {
+        {1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f},
+        {1.0f,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f},
+        {1.0f,  1.0f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f},
+        {1.0f,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f},
+        {1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f},
+        {1.0f,  0.0f,  1.0f,  1.0f,  0.0f,  0.0f,  0.0f, 0.0f}
+    },
+    // Up face
+    {
+        {0.0f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f, 1.0f},
+        {1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f,  1.0f, 0.0f},
+        {1.0f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f,  1.0f, 1.0f},
+        {1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f,  1.0f, 0.0f},
+        {0.0f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f, 1.0f},
+        {0.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f,  0.0f, 0.0f}
+    },
+    // Down face
+    {
+        {0.0f,  0.0f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f, 1.0f},
+        {1.0f,  0.0f,  0.0f,  0.0f, -1.0f,  0.0f,  1.0f, 1.0f},
+        {1.0f,  0.0f,  1.0f,  0.0f, -1.0f,  0.0f,  1.0f, 0.0f},
+        {1.0f,  0.0f,  1.0f,  0.0f, -1.0f,  0.0f,  1.0f, 0.0f},
+        {0.0f,  0.0f,  1.0f,  0.0f, -1.0f,  0.0f,  0.0f, 0.0f},
+        {0.0f,  0.0f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f, 1.0f}
+    },
+    // Back face
+    {
+        {0.0f,  0.0f,  0.0f,  0.0f,  0.0f, -1.0f,  0.0f, 0.0f},
+        {1.0f,  1.0f,  0.0f,  0.0f,  0.0f, -1.0f,  1.0f, 1.0f},
+        {1.0f,  0.0f,  0.0f,  0.0f,  0.0f, -1.0f,  1.0f, 0.0f},
+        {1.0f,  1.0f,  0.0f,  0.0f,  0.0f, -1.0f,  1.0f, 1.0f},
+        {0.0f,  0.0f,  0.0f,  0.0f,  0.0f, -1.0f,  0.0f, 0.0f},
+        {0.0f,  1.0f,  0.0f,  0.0f,  0.0f, -1.0f,  0.0f, 1.0f}
+    },
+    // Front face
+    {
+        {0.0f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f, 0.0f},
+        {1.0f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f,  1.0f, 0.0f},
+        {1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f,  1.0f, 1.0f},
+        {1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f,  1.0f, 1.0f},
+        {0.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f, 1.0f},
+        {0.0f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f, 0.0f}
+    },
 };
 
 
-unsigned int cube_indices[] = {
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-    12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-    24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35
-};
-
-// II. BUFFERS and VAO
-unsigned int load_vertex_buffers(unsigned int vertices_num, const float* vertices, unsigned int indices_num, const unsigned int* indices) {
-    // Buffers (Vertex, element)
-    unsigned int VBO, EBO; glGenBuffers(2, (&VBO, &EBO));
-    // Copy our vertices array in a buffer for OpenGL to use
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, vertices_num, vertices, GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_num, indices, GL_STATIC_DRAW);
-    return VBO, EBO;
-}
-
-unsigned int cube_buffers() {
-    return load_vertex_buffers(sizeof(cube_vertices), cube_vertices, sizeof(cube_indices), cube_indices);
-}
-
-unsigned int load_vertex_array(unsigned int VBO, unsigned int EBO) {
-    // Vertex array
-    unsigned int VAO; glGenVertexArrays(1, &VAO);
-    glBindVertexArray(VAO);
-    // Bind buffers
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    return VAO;
-}
-
-unsigned int cube_vao_with_attribs(unsigned int VBO, unsigned int EBO) {
-    unsigned int vao = load_vertex_array(VBO, EBO);
-    // Vertex shader attributes (positions, normals, uvs)
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3*sizeof(float)));
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6*sizeof(float)));
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    glEnableVertexAttribArray(2);
-    return vao;
-}
+// unsigned int cube_indices[] = {
+//     0,1,2, 1,0,3,
+//     0,1,2, 2,3,0,
+//     0,1,2, 2,3,0,
+//     0,1,2, 1,0,3,
+//     0,1,2, 1,0,3,
+//     0,1,2, 2,3,0,
+// };
 
 // III. Textures
 unsigned int load_texture(const char* path, uint colormap) {
@@ -324,14 +291,41 @@ void bind_texture(uint texture, uint unit) {
 }
 
 // ? - MONDE
-const int MAPW = 16;
-const int MAPH = 16;
-const int MAPD = 16;
-const int LOAD = 6;
+const int CHUNK_W = 16;
+const int CHUNK_H = 16;
+const int CHUNK_D = 16;
+const int LOAD = 1;
 
-bool in_map(uint x, uint y, uint z) {
-    return (0<=x && x<MAPW && 0<=y && y<MAPH && 0<=z && z<MAPD);
+ivec2 get_chunk_pos(int x, int y, int z) {
+    return ivec2(floor((float)x / (float)CHUNK_W), floor((float)z / (float)CHUNK_D));
+}
+ivec2 get_chunk_pos(ivec3 pos) {
+    return get_chunk_pos(pos.x, pos.y, pos.z);
+}
+
+bool in_chunk_local(int x, int y, int z) {
+    return (0<=x && x<CHUNK_W) && (0<=y && y<CHUNK_H) && (0<=z && z<CHUNK_D);
 }
 
 const float GRAVITY = 0.5f;
 const float JUMP_FORCE = 13.0f;
+
+// DEBUG
+GLenum glCheckError(const char *file, int line) {
+    GLenum errorCode;
+    while ((errorCode = glGetError()) != GL_NO_ERROR) {
+        string error;
+        switch (errorCode) {
+            case GL_INVALID_ENUM:                  error = "INVALID_ENUM"; break;
+            case GL_INVALID_VALUE:                 error = "INVALID_VALUE"; break;
+            case GL_INVALID_OPERATION:             error = "INVALID_OPERATION"; break;
+            // case GL_STACK_OVERFLOW:                error = "STACK_OVERFLOW"; break;
+            // case GL_STACK_UNDERFLOW:               error = "STACK_UNDERFLOW"; break;
+            case GL_OUT_OF_MEMORY:                 error = "OUT_OF_MEMORY"; break;
+            case GL_INVALID_FRAMEBUFFER_OPERATION: error = "INVALID_FRAMEBUFFER_OPERATION"; break;
+        }
+        cerr << error << " | " << file << " (" << line << ")" << endl;
+    }
+    return errorCode;
+}
+#define _check_error() glCheckError(__FILE__, __LINE__) 

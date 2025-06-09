@@ -2,9 +2,10 @@
 
 out vec4 FragColor;
 
-in vec2 uvs;
 in vec3 frag_pos;
 in vec3 normal;
+in vec2 uv;
+flat in int block_id;
 
 uniform vec3 color;
 uniform vec3 light_color;
@@ -28,7 +29,6 @@ uniform Block block;
 uniform DirLight dirlight;
 uniform sampler2D atlas;
 uniform vec2 atlas_size;
-uniform int hover;
 
 // PHONG
 vec3 calc_ambient(vec3 light_ambient, vec3 image, float attenuation=1.0) {
@@ -63,14 +63,10 @@ vec3 calc_dirlight(DirLight light, vec3 image) {
 }
 
 void main() {
-    vec4 image = texture2D(atlas, uvs);
+    vec4 image = texture2D(atlas, uv);
 
     vec3 frag_color;
     frag_color = calc_dirlight(dirlight, image.rgb);
-
-    if (hover == 1) {
-        frag_color = vec3(0,0,0);
-    }
 
     FragColor = vec4(frag_color, 1.0);
 }

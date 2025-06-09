@@ -1,9 +1,6 @@
 #include "util.cpp"
 #include "world.cpp"
 
-const vec3 RIGHT = vec3(1.0f, 0.0f, 0.0f); 
-const vec3 UP = vec3(0.0f, 1.0f, 0.0f); 
-const vec3 BACK = vec3(0.0f, 0.0f, 1.0f); 
 
 mat4 look_at(vec3 pos, vec3 target, vec3 fixed) {
     // base de la caméra
@@ -117,9 +114,9 @@ class Camera { public:
 };
 
 
-// uint minX = clamp(b.x-LOAD,0,MAPW-1); uint maxX = clamp(b.x+LOAD,0,MAPW-1);
-// uint minZ = clamp(b.z-LOAD,0,MAPD-1); uint maxZ = clamp(b.z+LOAD,0,MAPD-1);
-// uint minY = clamp(b.y-LOAD,0,MAPH-1); uint maxY = clamp(b.y+LOAD,0,MAPH-1);
+// uint minX = clamp(b.x-LOAD,0,CHUNK_W-1); uint maxX = clamp(b.x+LOAD,0,CHUNK_W-1);
+// uint minZ = clamp(b.z-LOAD,0,CHUNK_D-1); uint maxZ = clamp(b.z+LOAD,0,CHUNK_D-1);
+// uint minY = clamp(b.y-LOAD,0,CHUNK_H-1); uint maxY = clamp(b.y+LOAD,0,CHUNK_H-1);
 // for (uint x = minX; x <= maxX; x++) {
 // for (uint z = minZ; z <= maxZ; z++) {
 // for (uint y = minY; y <= maxY; y++) {
