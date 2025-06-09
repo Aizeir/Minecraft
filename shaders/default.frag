@@ -6,6 +6,7 @@ in vec3 frag_pos;
 in vec3 normal;
 in vec2 uv;
 flat in int block_id;
+flat in float lighting;
 
 uniform vec3 color;
 uniform vec3 light_color;
@@ -65,8 +66,8 @@ vec3 calc_dirlight(DirLight light, vec3 image) {
 void main() {
     vec4 image = texture2D(atlas, uv);
 
-    vec3 frag_color;
-    frag_color = calc_dirlight(dirlight, image.rgb);
+    vec3 frag_color = image.rgb * lighting;
+    //frag_color = calc_dirlight(dirlight, image.rgb);
 
     FragColor = vec4(frag_color, 1.0);
 }

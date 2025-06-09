@@ -184,10 +184,11 @@ struct Vertex {
     vec3 normal;
     vec2 uv;
     int id = 0;
+    float lighting = 1.0f;
 
     Vertex() = default;
-    Vertex(float x, float y, float z, float nx, float ny, float nz, float u, float v, int _id=0) :
-        pos(x,y,z), normal(nx,ny,nz), uv(u,v), id(_id) {};
+    Vertex(float x, float y, float z, float nx, float ny, float nz, float u, float v) :
+        pos(x,y,z), normal(nx,ny,nz), uv(u,v) {};
 };
 
 ostream& operator<<(ostream& os, const Vertex& v) {
@@ -201,21 +202,21 @@ const int VERTEX_PER_FACE = 6;
 Vertex cube_faces[6][VERTEX_PER_FACE] = {
     // Left face
     {
-        {0.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f},
+        {0.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f},
         {0.0f,  1.0f,  0.0f, -1.0f,  0.0f,  0.0f,  1.0f, 1.0f},
-        {0.0f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f},
-        {0.0f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f},
+        {0.0f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f},
+        {0.0f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f},
         {0.0f,  0.0f,  1.0f, -1.0f,  0.0f,  0.0f,  0.0f, 0.0f},
-        {0.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f}
+        {0.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f}
     },
     // Right face
     {
-        {1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f},
-        {1.0f,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f},
-        {1.0f,  1.0f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f},
-        {1.0f,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f},
-        {1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f},
-        {1.0f,  0.0f,  1.0f,  1.0f,  0.0f,  0.0f,  0.0f, 0.0f}
+        {1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f},
+        {1.0f,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f,  0.0f, 0.0f},
+        {1.0f,  1.0f,  0.0f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f},
+        {1.0f,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f,  0.0f, 0.0f},
+        {1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f},
+        {1.0f,  0.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f}
     },
     // Up face
     {
@@ -292,9 +293,9 @@ void bind_texture(uint texture, uint unit) {
 
 // ? - MONDE
 const int CHUNK_W = 16;
-const int CHUNK_H = 16;
+const int CHUNK_H = 30;
 const int CHUNK_D = 16;
-const int LOAD = 1;
+const int LOAD = 5;
 
 ivec2 get_chunk_pos(int x, int y, int z) {
     return ivec2(floor((float)x / (float)CHUNK_W), floor((float)z / (float)CHUNK_D));
@@ -309,6 +310,8 @@ bool in_chunk_local(int x, int y, int z) {
 
 const float GRAVITY = 0.5f;
 const float JUMP_FORCE = 13.0f;
+vec3 light_direction = normalize(vec3(-0.2f, -1.0f, -0.3f));
+
 
 // DEBUG
 GLenum glCheckError(const char *file, int line) {

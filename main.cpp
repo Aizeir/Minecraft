@@ -51,7 +51,7 @@ void mouse_callback(GLFWwindow* window, double mouse_x, double mouse_y) {
 // Fonction appelée à chaque clic
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && camera.selecting) {
-        world.set_block(camera.selection, -1);
+        world.set_block(camera.selection, AIR);
     }
 }
 
@@ -114,6 +114,10 @@ int main() {
     // - Block ID
     glVertexAttribIPointer(3, 1, GL_INT, sizeof(Vertex), (void*)offsetof(Vertex, id));
     glEnableVertexAttribArray(3);
+    // - Lighting
+    glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, lighting));
+    glEnableVertexAttribArray(4);
+
 
     // Projection
     mat4 projection = glm::perspective(rad(60.0f), (float)W / (float)H, 0.1f, 100.0f);
@@ -143,7 +147,7 @@ int main() {
         program.set_vec2("atlas_size", vec2(4,4));
         program.set_float("material.shininess", 32.0f);
 
-        program.set_vec3("dirlight.direction", vec3(-0.2f, -1.0f, -0.3f));
+        program.set_vec3("dirlight.direction", light_direction);
         program.set_vec3("dirlight.ambient",  vec3(1.0f,1.0f,1.0f));
         program.set_vec3("dirlight.diffuse",  vec3(0.7f, 0.7f, 0.7f)); // darken diffuse light a bit
         program.set_vec3("dirlight.specular", vec3(0.f, 0.f, 0.f)); 
@@ -171,49 +175,13 @@ int main() {
                 chunk = world.load_chunk(cx,cz);
             }
 
-            // Génération des vertices
-            vector<Vertex> vertices;
-            vector<int> indices;
-
-            // Parcourir tous les blocs
-            for (int x=0;x<CHUNK_W;x++) {
-            for (int y=0;y<CHUNK_H;y++) {
-            for (int z=0;z<CHUNK_D;z++) {
-
-            // Block ID
-            ivec3 block(cx*CHUNK_W+x, y, cz*CHUNK_D+z);
-            int id = chunk->get_local_block(x,y,z);
-            if (id == -1) continue;
-
-            // Matrices
-            mat4 model = glm::translate(mat4(1.0f), (vec3)block);
-            mat3 normal_mat = glm::mat3(glm::transpose(glm::inverse(model)));
-
-            // Blocs voisins
-            for (int face_idx=0; face_idx<6; face_idx++) {
-                // Face visible
-                if (!world.is_solid(block + IDIRS[face_idx])) {
-                    // Copier une face au vertices/indices
-                    for (int vert_idx=0;vert_idx<6;vert_idx++) {
-
-                        Vertex vertex = cube_faces[face_idx][vert_idx];
-                        vertex.pos = vec3(model * vec4(vertex.pos, 1.0f));
-                        vertex.normal = normalize(vec3(model * vec4(vertex.normal, 1.0f)));
-                        vertex.id = id;
-                        vertices.push_back(vertex);
-                        int last_index = indices.size() > 0 ? indices.back() : 0;
-                        indices.push_back(last_index + 1);
-                    }
-                }
-            }
-            }}}
             glBindVertexArray(VAO);
             // - Vertices
-            glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, chunk->vertices.size() * sizeof(Vertex), chunk->vertices.data(), GL_STATIC_DRAW);
             // - Indices (-33% sommets)
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(int), indices.data(), GL_STATIC_DRAW);
+            //glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(int), indices.data(), GL_STATIC_DRAW);
             // Draw final
-            glDrawArrays(GL_TRIANGLES, 0, vertices.size());
+            glDrawArrays(GL_TRIANGLES, 0, chunk->vertices.size());
             //glDrawElements(GL_TRIANGLES, vertices.size(), GL_UNSIGNED_INT, nullptr);
         }}
 

@@ -112,11 +112,3 @@ class Camera { public:
         right_xy = glm::cross(front_xy, UP);
     }
 };
-
-
-// uint minX = clamp(b.x-LOAD,0,CHUNK_W-1); uint maxX = clamp(b.x+LOAD,0,CHUNK_W-1);
-// uint minZ = clamp(b.z-LOAD,0,CHUNK_D-1); uint maxZ = clamp(b.z+LOAD,0,CHUNK_D-1);
-// uint minY = clamp(b.y-LOAD,0,CHUNK_H-1); uint maxY = clamp(b.y+LOAD,0,CHUNK_H-1);
-// for (uint x = minX; x <= maxX; x++) {
-// for (uint z = minZ; z <= maxZ; z++) {
-// for (uint y = minY; y <= maxY; y++) {

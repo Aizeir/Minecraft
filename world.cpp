@@ -3,6 +3,7 @@
 #include <FastNoiseLite.h>
 #include <vector>
 #include <unordered_map>
+#include "block.cpp"
 
 struct pair_hash {
     std::size_t operator()(const std::pair<int, int>& p) const {
@@ -38,12 +39,13 @@ class World {public:
 
 
 class Chunk {public:
+    World* world;
     int chunk_x, chunk_z;
     int map[CHUNK_W][CHUNK_D][CHUNK_H];
     //vector<array<array<int, CHUNK_W>, CHUNK_D>> map;
 
     Chunk() = default;
-    Chunk(World* world, int cx, int cz): chunk_x(cx), chunk_z(cz) {
+    Chunk(World* world, int cx, int cz): world(world), chunk_x(cx), chunk_z(cz) {
         // Génération procédurale
         for (int x=0;x<CHUNK_W;x++) {
         for (int z=0;z<CHUNK_D;z++) {
@@ -52,10 +54,56 @@ class Chunk {public:
         
         // Choix des blocs
         for (int y=0;y<CHUNK_H;y++) {
-            if      (y >= ground) map[x][z][y] = -1;
-            else if (y >= ground-1) map[x][z][y] = 0;
-            else if (y >= ground-3) map[x][z][y] = 1;
-            else if (y >=  0) map[x][z][y] = 2;
+            if      (y >= ground) map[x][z][y] = AIR;
+            else if (y >= ground-1) map[x][z][y] = GRASS;
+            else if (y >= ground-3) map[x][z][y] = DIRT;
+            else if (y >=  0) map[x][z][y] = STONE;
+        }}}
+
+        create_mesh();
+    }
+
+    vector<Vertex> vertices;
+    void create_mesh() {
+        vertices.clear();
+        // Parcourir tous les blocs
+        for (int x=0;x<CHUNK_W;x++) {
+        for (int y=0;y<CHUNK_H;y++) {
+        for (int z=0;z<CHUNK_D;z++) {
+
+        // Block ID
+        ivec3 block(chunk_x*CHUNK_W+x, y, chunk_z*CHUNK_D+z);
+        int id = get_local_block(x,y,z);
+        if (id == AIR) continue;
+
+        // Matrices
+        mat4 model = glm::translate(mat4(1.0f), (vec3)block);
+        mat3 normal_mat = glm::mat3(glm::transpose(glm::inverse(model)));
+
+        // Blocs voisins
+        for (int face_idx=0; face_idx<6; face_idx++) {
+            // Face visible
+            if (!is_solid_local(x + IDIRS[face_idx].x, y + IDIRS[face_idx].y, z + IDIRS[face_idx].z)) {
+
+                // Lighting
+                vec3 normal = cube_faces[face_idx][0].normal;
+                normal = normalize(vec3(normal_mat * vec4(normal, 1.0f)));
+
+                float value = max(0.f, (dot(light_direction, -normal)+1.0f)/2.0f);
+                float lighting = pow(value, 1.0f / 2.2f) * 2; // gamma
+
+                // Copier tous les vertices
+                for (int vert_idx=0;vert_idx<6;vert_idx++) {
+                    Vertex vertex = cube_faces[face_idx][vert_idx];
+                    vertex.pos = vec3(model * vec4(vertex.pos, 1.0f));
+                    vertex.normal = normalize(vec3(normal_mat * vec4(vertex.normal, 1.0f)));
+                    vertex.id = BlockData[id].faces[face_idx];
+                    vertex.lighting = lighting;
+                    vertices.push_back(vertex);
+                }
+            }
+        }
+
         }}}
     }
 
@@ -92,8 +140,8 @@ class Chunk {public:
     }
 
     bool is_solid_local(int x, int y, int z) {
-        if (!(0 <= y < CHUNK_H)) return false;
-        return get_local_block(x,y,z) != -1;
+        if (!in_chunk_local(x,y,z)) return false;
+        return get_local_block(x,y,z) != AIR;
     }
 
     bool is_solid(int x, int y, int z) {
@@ -118,7 +166,8 @@ World::World(vec3 spawn_pos) {
 }
 
 Chunk* World::load_chunk(int cx, int cz) {
-    chunks[{cx, cz}] = Chunk(this, cx, cz);
+    Chunk chunk = Chunk(this, cx, cz);
+    chunks[{cx, cz}] = chunk;
     return &chunks[{cx, cz}];
 }
 
@@ -137,7 +186,7 @@ bool World::is_solid(int x, int y, int z) {
 }
 
 int World::get_block(int x, int y, int z) {
-    Chunk* chunk = get_chunk_of_block(x,y,z); if (chunk==nullptr) return -1;
+    Chunk* chunk = get_chunk_of_block(x,y,z); if (chunk==nullptr) return AIR;
     return chunk->get_block(x,y,z);
 }
 
