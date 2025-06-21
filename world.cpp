@@ -19,7 +19,7 @@ class World {public:
 
     World(vec3 spawn_pos);
 
-    Chunk* load_chunk(int cx, int cz);
+    Chunk* create_chunk(int cx, int cz);
 
     Chunk* get_chunk(int cx, int cz);
     Chunk* get_chunk_of_block(int x, int y, int z);
@@ -38,14 +38,18 @@ class World {public:
 };
 
 
+const int ESTIMATED_NUM_CUBES = CHUNK_W*CHUNK_H*CHUNK_D - (CHUNK_W-2)*(CHUNK_H-2)*(CHUNK_D-2);
+const int ESTIMATED_NUM_VERTICES = ESTIMATED_NUM_CUBES * 2 * VERTEX_PER_FACE;
+
 class Chunk {public:
     World* world;
     int chunk_x, chunk_z;
     int map[CHUNK_W][CHUNK_D][CHUNK_H];
     //vector<array<array<int, CHUNK_W>, CHUNK_D>> map;
+    bool is_new;
 
     Chunk() = default;
-    Chunk(World* world, int cx, int cz): world(world), chunk_x(cx), chunk_z(cz) {
+    Chunk(World* world, int cx, int cz): world(world), chunk_x(cx), chunk_z(cz), is_new(true) {
         // Génération procédurale
         for (int x=0;x<CHUNK_W;x++) {
         for (int z=0;z<CHUNK_D;z++) {
@@ -55,17 +59,24 @@ class Chunk {public:
         // Choix des blocs
         for (int y=0;y<CHUNK_H;y++) {
             if      (y >= ground) map[x][z][y] = AIR;
-            else if (y >= ground-1) map[x][z][y] = GRASS;
-            else if (y >= ground-3) map[x][z][y] = DIRT;
-            else if (y >=  0) map[x][z][y] = STONE;
+            else if (y >= ground-3) {
+                if (ground > SEA_LEVEL) {
+                    if (y  == ground-1) {map[x][z][y] = GRASS;}
+                    else {map[x][z][y] = DIRT;}
+                }
+                else {
+                    map[x][z][y] = SAND;
+                }
+            }
+            else if (y >=  0) map[x][z][y] = STONE;     
         }}}
-
-        create_mesh();
     }
 
     vector<Vertex> vertices;
     void create_mesh() {
+        is_new = false;
         vertices.clear();
+        vertices.reserve(ESTIMATED_NUM_VERTICES);
         // Parcourir tous les blocs
         for (int x=0;x<CHUNK_W;x++) {
         for (int y=0;y<CHUNK_H;y++) {
@@ -76,29 +87,37 @@ class Chunk {public:
         int id = get_local_block(x,y,z);
         if (id == AIR) continue;
 
-        // Matrices
-        mat4 model = glm::translate(mat4(1.0f), (vec3)block);
-        mat3 normal_mat = glm::mat3(glm::transpose(glm::inverse(model)));
+        // Matrices (utile uniquement si +commpliqué que des translations)
+        //mat4 model = glm::translate(mat4(1.0f), (vec3)block);
+        //mat3 normal_mat = glm::mat3(glm::transpose(glm::inverse(model)));
+        //normal = normalize(vec3(normal_mat * vec4(normal, 1.0f)));
+        //vertex.normal = normalize(vec3(normal_mat * vec4(vertex.normal, 1.0f)));
 
         // Blocs voisins
         for (int face_idx=0; face_idx<6; face_idx++) {
-            // Face visible
-            if (!is_solid_local(x + IDIRS[face_idx].x, y + IDIRS[face_idx].y, z + IDIRS[face_idx].z)) {
+            // Bloc voisin
+            ivec3 n(x + IDIRS[face_idx].x, y + IDIRS[face_idx].y, z + IDIRS[face_idx].z);
 
+            // La face est elle visible ?
+            bool hidden;
+            if (in_chunk_local(n.x, n.y, n.z))
+                hidden = is_solid_local(n.x, n.y, n.z);
+            else
+                hidden = world->is_solid(chunk_x*CHUNK_W+n.x, n.y, chunk_z*CHUNK_D+n.z);
+
+            if (!hidden) {
                 // Lighting
                 vec3 normal = cube_faces[face_idx][0].normal;
-                normal = normalize(vec3(normal_mat * vec4(normal, 1.0f)));
-
                 float value = max(0.f, (dot(light_direction, -normal)+1.0f)/2.0f);
                 float lighting = pow(value, 1.0f / 2.2f) * 2; // gamma
 
                 // Copier tous les vertices
                 for (int vert_idx=0;vert_idx<6;vert_idx++) {
                     Vertex vertex = cube_faces[face_idx][vert_idx];
-                    vertex.pos = vec3(model * vec4(vertex.pos, 1.0f));
-                    vertex.normal = normalize(vec3(normal_mat * vec4(vertex.normal, 1.0f)));
+                    vertex.pos += block;
                     vertex.id = BlockData[id].faces[face_idx];
                     vertex.lighting = lighting;
+                    vertex.block = block;
                     vertices.push_back(vertex);
                 }
             }
@@ -113,6 +132,8 @@ class Chunk {public:
 
     void set_local_block(int x, int y, int z, int id) {
         map[x][z][y] = id;
+        create_mesh();
+        update_neighbor_meshes(x,y,z);
     }
 
     bool in_chunk(int x, int y, int z) {
@@ -150,7 +171,23 @@ class Chunk {public:
         x -= chunk_x * CHUNK_W; z -= chunk_z * CHUNK_D;
         return is_solid_local(x,y,z);
     }
+
+    void update_neighbor_meshes(int local_x, int y, int local_z) {
+        int x = chunk_x*CHUNK_W + local_x, z = chunk_z*CHUNK_D + local_z;
+
+        for (int i=0; i<size(IDIRS); i++) {
+            ivec3 dir = IDIRS[i];
+            Chunk* n = world->get_chunk_of_block(x + dir.x, y + dir.y, z + dir.z);
+            if (n != nullptr && !(n->chunk_x==chunk_x && n->chunk_z==chunk_z)){
+                n->create_mesh();
+            }
+        }
+    }
 };
+
+ostream& operator<<(ostream& os, const Chunk& chunk) {
+    return os << "Chunk (" << chunk.chunk_x << " " << chunk.chunk_z << ")";
+}
 
 // WORLD
 
@@ -165,9 +202,8 @@ World::World(vec3 spawn_pos) {
     }}
 }
 
-Chunk* World::load_chunk(int cx, int cz) {
-    Chunk chunk = Chunk(this, cx, cz);
-    chunks[{cx, cz}] = chunk;
+Chunk* World::create_chunk(int cx, int cz) {
+    chunks[{cx, cz}] = Chunk(this, cx, cz);         // Création dans la map
     return &chunks[{cx, cz}];
 }
 
@@ -195,7 +231,3 @@ void World::set_block(int x, int y, int z, int id) {
     return chunk->set_block(x,y,z, id);
 }
 
-// Autre
-ostream& operator<<(ostream& os, const Chunk& chunk) {
-    return os << "Chunk (" << chunk.chunk_x << " " << chunk.chunk_z << ")";
-}

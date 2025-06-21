@@ -28,6 +28,8 @@ typedef glm::mat4 mat4;
 
 const int W = 1280;
 const int H = 720;
+const float Wf = (float)W;
+const float Hf = (float)H;
 
 inline float  rad(float  deg) {return glm::radians(deg);}
 inline double rad(double deg) {return glm::radians(deg);}
@@ -89,6 +91,23 @@ ostream& operator<<(ostream& os, const glm::vec2& v) {
 }
 ostream& operator<<(ostream& os, const glm::vec3& v) {
     return os << "vec3(" << v.x << ", " << v.y << ", " << v.z << ")";
+}
+ostream& operator<<(ostream& os, const glm::vec4& v) {
+    return os << "vec4(" << v.x << ", " << v.y << ", " << v.z << ", " << v.w << ")";
+}
+
+
+vec4 get_rect(float x, float y, float w, float h) {
+    return vec4(x-w/2.0f, y-h/2.0f, w, h);
+}
+vec4 get_rect(vec4 rect) {
+    return get_rect(rect.x,rect.y,rect.z,rect.w);
+}
+vec4 texcoord_rect(float x, float y, float w, float h) {
+    return vec4(x/Wf,y/Hf,w/Wf,h/Hf);
+}
+vec4 texcoord_rect(vec4 rect) {
+    return texcoord_rect(rect.x,rect.y,rect.z,rect.w);
 }
 
 // I. SHADERS
@@ -168,6 +187,9 @@ class Program { public:
     void set_vec2(const string &name, glm::vec2 vec) const{
         glUniform2f(glGetUniformLocation(ID, name.c_str()), vec.x, vec.y);
     }
+    void set_ivec3(const string &name, glm::ivec3 vec) const{
+        glUniform3i(glGetUniformLocation(ID, name.c_str()), vec.x, vec.y, vec.z);
+    }
     // ------------------------------------------------------------------------
     void set_mat4(const string &name, glm::mat4 mat) const{
         glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, glm::value_ptr(mat));
@@ -185,6 +207,7 @@ struct Vertex {
     vec2 uv;
     int id = 0;
     float lighting = 1.0f;
+    ivec3 block = {0,0,0};
 
     Vertex() = default;
     Vertex(float x, float y, float z, float nx, float ny, float nz, float u, float v) :
@@ -256,6 +279,16 @@ Vertex cube_faces[6][VERTEX_PER_FACE] = {
     },
 };
 
+float quad_vertices[] = {
+    -1.0f,  1.0f,  0.0f, 1.0f,
+    -1.0f, -1.0f,  0.0f, 0.0f,
+    1.0f, -1.0f,  1.0f, 0.0f,
+
+    -1.0f,  1.0f,  0.0f, 1.0f,
+    1.0f, -1.0f,  1.0f, 0.0f,
+    1.0f,  1.0f,  1.0f, 1.0f
+};
+
 
 // unsigned int cube_indices[] = {
 //     0,1,2, 1,0,3,
@@ -267,13 +300,26 @@ Vertex cube_faces[6][VERTEX_PER_FACE] = {
 // };
 
 // III. Textures
-unsigned int load_texture(const char* path, uint colormap) {
+struct Texture {
+    unsigned int texture;
+    uint unit;
+};
+
+void bind_texture(Texture texture) {
+    glActiveTexture(GL_TEXTURE0 + texture.unit);
+    glBindTexture(GL_TEXTURE_2D, texture.texture);
+}
+
+unsigned int texture_next_unit = 0;
+Texture load_texture(const char* path, uint colormap, bool bind=false) {
     unsigned int texture;
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     stbi_set_flip_vertically_on_load(true);
 
     int width, height, num_channels;
@@ -281,21 +327,22 @@ unsigned int load_texture(const char* path, uint colormap) {
 
     glTexImage2D(GL_TEXTURE_2D, 0, colormap, width, height, 0, colormap, GL_UNSIGNED_BYTE, data);
     glGenerateMipmap(GL_TEXTURE_2D);
-    
-    stbi_image_free(data);
-    return texture;
-}
 
-void bind_texture(uint texture, uint unit) {
-    glActiveTexture(GL_TEXTURE0 + unit);
-    glBindTexture(GL_TEXTURE_2D, texture);
+    stbi_image_free(data);
+
+    Texture texture_obj = {texture, texture_next_unit};
+    texture_next_unit += 1;
+
+    if (bind) bind_texture(texture_obj);
+    return texture_obj;
 }
 
 // ? - MONDE
 const int CHUNK_W = 16;
 const int CHUNK_H = 30;
 const int CHUNK_D = 16;
-const int LOAD = 5;
+const int LOAD = 8;
+const int SEA_LEVEL = 3;
 
 ivec2 get_chunk_pos(int x, int y, int z) {
     return ivec2(floor((float)x / (float)CHUNK_W), floor((float)z / (float)CHUNK_D));
@@ -311,6 +358,7 @@ bool in_chunk_local(int x, int y, int z) {
 const float GRAVITY = 0.5f;
 const float JUMP_FORCE = 13.0f;
 vec3 light_direction = normalize(vec3(-0.2f, -1.0f, -0.3f));
+const ivec3 SELECTION_DEFAULT = {0, -1, 0};
 
 
 // DEBUG

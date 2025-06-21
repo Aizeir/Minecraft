@@ -5,15 +5,18 @@ out vec4 FragColor;
 in vec3 frag_pos;
 in vec3 normal;
 in vec2 uv;
-flat in int block_id;
+flat in int block_material_id;
 flat in float lighting;
+flat in ivec3 block;
 
 uniform vec3 color;
 uniform vec3 light_color;
 uniform vec3 light_pos;
 uniform vec3 camera_pos;
+uniform ivec3 selection;
+uniform ivec3 selection_face;
 
-struct Block {
+struct Material {
     int id;
     float shininess;
 }; 
@@ -26,7 +29,7 @@ struct DirLight {
     vec3 direction;
 };
 
-uniform Block block;
+uniform Material block_material;
 uniform DirLight dirlight;
 uniform sampler2D atlas;
 uniform vec2 atlas_size;
@@ -46,7 +49,7 @@ vec3 calc_specular(vec3 light_dir, vec3 light_specular, vec3 image, float attenu
     vec3 halfway_dir = normalize(light_dir + view_dir);
 
     vec3 specular_map = image;
-    float specular_value = max(pow(dot(normal, halfway_dir), block.shininess), 0.0);
+    float specular_value = max(pow(dot(normal, halfway_dir), block_material.shininess), 0.0);
     return light_specular * (specular_value * image * attenuation);
 }
 
@@ -67,7 +70,18 @@ void main() {
     vec4 image = texture2D(atlas, uv);
 
     vec3 frag_color = image.rgb * lighting;
+    vec3 result = frag_color;
     //frag_color = calc_dirlight(dirlight, image.rgb);
 
-    FragColor = vec4(frag_color, 1.0);
+    // Selection
+    if (block == selection) {
+        result = mix(vec3(0), frag_color, 0.5);
+        
+        // ivec3 face_dir = ivec3(round(normal));
+        // if (face_dir == selection_face) {
+        //     result = mix(vec3(0), frag_color, 0.5);
+        // }
+    }
+
+    FragColor = vec4(result, 1.0);
 }

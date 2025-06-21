@@ -16,6 +16,11 @@ enum Blocks {
     IRON = 3,
     COPPER = 4,
     GOLD = 5,
+    SAND = 6,
+    WOOD = 7,
+    WOOD_STUMP = 8,
+    LEAVES = 9,
+    PLANKS = 10,
 };
 
 Block BlockData[] = {
@@ -25,4 +30,9 @@ Block BlockData[] = {
     Block(IRON,  {4,4,7,7,4,4}),
     Block(COPPER,{5,5,7,7,5,5}),
     Block(GOLD,  {6,6,7,7,6,6}),
+    Block(SAND,  {8,8,8,8,8,8}),
+    Block(WOOD,  {9,9,11,11,9,9}),
+    Block(WOOD_STUMP,  {10,10,11,11,10,10}),
+    Block(LEAVES,  {12,12,12,12,12,12}),
+    Block(PLANKS,  {13,13,13,13,13,13}),
 };
