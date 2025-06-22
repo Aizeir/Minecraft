@@ -2,6 +2,8 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <unordered_set>
+#include <filesystem>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <math.h>
@@ -23,6 +25,7 @@ typedef glm::vec3 vec3;
 typedef glm::ivec2 ivec2;
 typedef glm::ivec3 ivec3;
 typedef glm::vec4 vec4;
+typedef glm::ivec4 ivec4;
 typedef glm::mat3 mat3;
 typedef glm::mat4 mat4;
 
@@ -73,6 +76,61 @@ string read_file(string path) {
     return content;
 }
 
+string expand_shader_includes(const string& shader_code, const filesystem::path& base_directory, unordered_set<string>& included_files) {
+    // Create string streams for input and output
+    stringstream input(shader_code);
+    ostringstream output;
+    string line;
+
+    // Process each line of the shader code
+    while (std::getline(input, line)) {
+        // Check for #include directive at the start of the line
+        if (line.find("#include") == 0) {
+            // Extract the filename between quotes
+            size_t start = line.find('"') + 1;
+            size_t end = line.find('"', start);
+            if (start == string::npos || end == string::npos || end <= start) {
+                cerr << "Erreur de syntaxe include: " << line << endl;
+                continue;
+            }
+
+            string include_file = line.substr(start, end - start);
+            filesystem::path full_path = base_directory / include_file;
+            string full_path_str = full_path.lexically_normal().string();
+
+            // Skip duplicate includes
+            if (included_files.count(full_path_str)) {
+                output << "// (skip duplicate include: " << include_file << ")\n";
+                continue;
+            }
+
+            // Try to open the include file
+            ifstream file(full_path);
+            if (!file.is_open()) {
+                cerr << "Erreur : impossible d'ouvrir " << full_path_str << endl;
+                continue;
+            }
+
+            // Mark this file as included
+            included_files.insert(full_path_str);
+            stringstream included_code;
+            included_code << file.rdbuf();
+
+            // Recursively expand includes in the included file
+            output << "// Begin include: " << include_file << "\n";
+            output << expand_shader_includes(included_code.str(), full_path.parent_path(), included_files);
+            output << "// End include: " << include_file << "\n";
+        }
+        else {
+            // Output normal lines directly
+            output << line << "\n";
+        }
+    }
+
+    // Return the expanded shader code
+    return output.str();
+}
+
 template <typename TYPENAME>
 TYPENAME clamp(TYPENAME value, TYPENAME minVal, TYPENAME maxVal) {
     if (value < minVal) return minVal;
@@ -108,6 +166,14 @@ vec4 texcoord_rect(float x, float y, float w, float h) {
 }
 vec4 texcoord_rect(vec4 rect) {
     return texcoord_rect(rect.x,rect.y,rect.z,rect.w);
+}
+
+int randint(int a, int b) {
+    return a + rand() % (b-a+1);
+}
+
+bool proba(int x) {
+    return randint(1,x) == 1;
 }
 
 // I. SHADERS
@@ -154,8 +220,16 @@ class Program { public:
     unsigned int ID;
 
     Program(string vert_path, string frag_path) {
+        // files
         string vert_code_str = read_file(vert_path);
         string frag_code_str = read_file(frag_path);
+        // includes
+        unordered_set<string> already_included;
+        vert_code_str = expand_shader_includes(vert_code_str, "assets/shaders", already_included);
+        already_included.clear();
+        frag_code_str = expand_shader_includes(frag_code_str, "assets/shaders", already_included);
+        
+        // code
         const char* vert_code = vert_code_str.c_str();
         const char* frag_code = frag_code_str.c_str();
         ID = load_shader_program(vert_code, frag_code);
@@ -342,7 +416,8 @@ const int CHUNK_W = 16;
 const int CHUNK_H = 30;
 const int CHUNK_D = 16;
 const int LOAD = 8;
-const int SEA_LEVEL = 3;
+const int SEA_LEVEL = 10;
+const int BED_LEVEL = 4;
 
 ivec2 get_chunk_pos(int x, int y, int z) {
     return ivec2(floor((float)x / (float)CHUNK_W), floor((float)z / (float)CHUNK_D));

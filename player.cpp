@@ -1,0 +1,100 @@
+#pragma once
+#include "util.cpp"
+#include "world.cpp"
+#include "camera.cpp"
+
+bool rect3d_collision(vec3 a1, vec3 a2, vec3 b1, vec3 b2) {
+    // Check for overlap in all three axes
+    return (a1.x <= b2.x && a2.x >= b1.x) &&
+           (a1.y <= b2.y && a2.y >= b1.y) &&
+           (a1.z <= b2.z && a2.z >= b1.z);
+}
+
+class Player { public:
+    Camera* camera;
+    vec3* pos;
+
+    const float movement_speed = 4.0f;
+    const float sprint_speed = 8.0f;
+    const vec3 size = vec3(0.5f,1.5f,0.5f);
+    const vec3 cam_off = vec3(0.0f, 0.75f, 0.0f);
+
+    vec3 speed = vec3();
+    bool sprint = false;
+    bool ground = false;
+
+    Player(Camera* camera): camera(camera) {
+        pos = &(camera->pos);
+    }
+
+    float get_speed() { return sprint ? sprint_speed : movement_speed; }
+    
+    ivec3 get_block() { return ivec3(floor(*pos)); }
+
+    bool collides(ivec3 block) {
+        // NE VERIFIE PAS LA SOLIDITE !!!
+        vec3 center = *pos - cam_off;
+        return rect3d_collision(center-size/2.0f, center+size/2.0f, (vec3)block, (vec3)block+vec3(1,1,1));
+    }
+
+    bool collisions(World* world, vec3 dv) {
+        // Hitbox rectangle
+        vec3 side_plus = size / 2.0f + cam_off;
+        vec3 side_minus = size / 2.0f - cam_off;
+        int min_x = floor(pos->x + dv.x - side_plus.x);
+        int max_x = floor(pos->x + dv.x + side_minus.x);
+        int min_y = floor(pos->y + dv.y - side_plus.y);
+        int max_y = floor(pos->y + dv.y + side_minus.y);
+        int min_z = floor(pos->z + dv.z - side_plus.z);
+        int max_z = floor(pos->z + dv.z + side_minus.z);
+
+        // Collisions
+        for (int x = min_x; x <= max_x; x++) {
+        for (int y = min_y; y <= max_y; y++) {
+        for (int z = min_z; z <= max_z; z++) {
+        if (world->is_solid(x, y, z)) {
+
+            // if (dv.x < 0) { pos->x = x + 1 + side_plus.x; } // left = block.right <=> center = block.right + side
+            // if (dv.x > 0) { pos->x = x - side_minus.x; }
+            if (dv.y < 0) { pos->y = y + 1 + side_plus.y; }
+            if (dv.y > 0) { pos->y = y - side_minus.y; }
+            // if (dv.z < 0) { pos->z = z + 1 + side_plus.z; }
+            // if (dv.z > 0) { pos->z = z - side_minus.z; }
+
+            return true;
+        }
+        }}}
+        return false;
+    }
+
+    void update(float dt, World* world) {
+        // camera
+        camera->update(dt, world);
+        
+        // gravity
+        speed.y -= GRAVITY;
+        ground = false;
+
+        // Collisions
+        vec3 dv = speed*dt; 
+        if (collisions(world, vec3(dv.x, 0.0f, 0.0f))) {
+            speed.x = 0;
+        }
+        else {
+            pos->x += dv.x;
+        }
+        if (collisions(world, vec3(0.0f, dv.y, 0.0f))) {
+            speed.y = 0;
+            if (dv.y < 0) ground = true;
+        }
+        else {
+            pos->y += dv.y;
+        }
+        if (collisions(world, vec3(0.0f, 0.0f, dv.z))) {
+            speed.z = 0;
+        }
+        else {
+            pos->z += dv.z;
+        }
+    }
+};

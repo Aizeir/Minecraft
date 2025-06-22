@@ -1,6 +1,7 @@
 #include "util.cpp"
 #include "camera.cpp"
 #include "world.cpp"
+#include "player.cpp"
 
 // RAYCAST VERTICAL BUG
 
@@ -11,6 +12,7 @@ bool is_first_mouse_pos = true;
 vec2 last_mouse_pos;
 
 Camera camera = Camera();
+Player player = Player(&camera);
 World world = World(camera.pos);
 
 void input(GLFWwindow *w, Camera& camera) {
@@ -21,16 +23,15 @@ void input(GLFWwindow *w, Camera& camera) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
     // Moving
-    camera.speed.x = camera.speed.z = camera.speed.y = 0; ////;
-    if (glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS) camera.speed += camera.front_xy * camera.movement_speed;
-    if (glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS) camera.speed -= camera.front_xy * camera.movement_speed;
-    if (glfwGetKey(w, GLFW_KEY_A) == GLFW_PRESS) camera.speed -= camera.right_xy * camera.movement_speed;
-    if (glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS) camera.speed += camera.right_xy * camera.movement_speed;
-    if (glfwGetKey(w, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) camera.speed -= UP * camera.movement_speed;
-    if (glfwGetKey(w, GLFW_KEY_E) == GLFW_PRESS) camera.speed += UP * camera.movement_speed;
+    player.sprint = (glfwGetKey(w, GLFW_KEY_F) == GLFW_PRESS);
+    player.speed.x = player.speed.z = 0; ////;
+    if (glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS) player.speed += camera.front_xy * player.get_speed();
+    if (glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS) player.speed -= camera.front_xy * player.get_speed();
+    if (glfwGetKey(w, GLFW_KEY_A) == GLFW_PRESS) player.speed -= camera.right_xy * player.get_speed();
+    if (glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS) player.speed += camera.right_xy * player.get_speed();
 
     // Jump
-    if (glfwGetKey(w, GLFW_KEY_SPACE) == GLFW_PRESS && camera.ground) camera.speed.y = JUMP_FORCE;
+    if (glfwGetKey(w, GLFW_KEY_SPACE) == GLFW_PRESS && player.ground) player.speed.y = JUMP_FORCE;
 
 }
 
@@ -47,16 +48,19 @@ void mouse_callback(GLFWwindow* window, double mouse_x, double mouse_y) {
 
     camera.yaw += offset.x;
     camera.pitch -= offset.y;
-    camera.pitch = clamp(camera.pitch, -89.f, 89.f);
+    camera.pitch = clamp(camera.pitch, -89.0f, 89.0f);
 }
 
 // Fonction appelée à chaque clic
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && camera.selecting) {
-        world.set_block(camera.selection, AIR);
+        if (world.get_block(camera.selection) != BEDROCK) {
+            world.set_block(camera.selection, AIR);
+        }
     }
     if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS && camera.selecting) {
-        world.set_block(camera.selection+camera.selection_face, DIRT);
+        if (!player.collides(camera.selection+camera.selection_face))
+            world.set_block(camera.selection+camera.selection_face, PLANKS);
     }}
 
 GLFWwindow* setup() {
@@ -82,6 +86,10 @@ GLFWwindow* setup() {
         glViewport(0, 0, width, height);
     });
     glEnable(GL_CULL_FACE);
+
+    // Seeder le random (enfin, je crois)
+    srand((unsigned)(time(0)));
+
     return window;
 }
 
@@ -162,7 +170,7 @@ int main() {
     glEnableVertexAttribArray(5);
 
     // Projection
-    mat4 projection = glm::perspective(rad(60.0f), (float)W / (float)H, 0.1f, 100.0f);
+    mat4 projection = glm::perspective(rad(60.0f), (float)W / (float)H, 0.1f, (float)((LOAD-2) * CHUNK_W) * (float)sqrt(2));
 
     // UI
     unsigned int VBO_UI; glGenBuffers(1, &VBO_UI);
@@ -191,8 +199,8 @@ int main() {
 
         // update
         input(window, camera);
-        // camera
-        camera.update(dt, &world);
+        // player
+        player.update(dt, &world);
         
         // WORLD
         glBindFramebuffer(GL_FRAMEBUFFER, world_frame);
@@ -209,7 +217,7 @@ int main() {
         wd_program.set_vec3("camera_pos", camera.pos);
 
         wd_program.set_int("atlas", atlas.unit);
-        wd_program.set_vec2("atlas_size", vec2(4,4));
+        wd_program.set_vec2("atlas_size", vec2(4,8));
         wd_program.set_float("material.shininess", 32.0f);
 
         wd_program.set_vec3("dirlight.direction", light_direction);
@@ -233,7 +241,7 @@ int main() {
         wd_program.set_ivec3("selection_face", camera.selection_face);
 
         // Chunks
-        ivec2 c = get_chunk_pos(camera.block());
+        ivec2 c = get_chunk_pos(player.get_block());
 
         // Générer les nouveaux chunks
         for (int cx = c.x-LOAD; cx <= c.x + LOAD; cx++) {

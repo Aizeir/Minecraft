@@ -22,7 +22,7 @@ void main() {
 
     frag_pos = aPos;
     normal = aNormal;
-    uv = (vec2(aId % 4, 3 - aId / 4) + abs(aTexCoord - vec2(0.05))) / atlas_size;
+    uv = (vec2(aId % 4, atlas_size.y - 1 - aId / 4) + aTexCoord) / atlas_size;
     block_id = aId;
     lighting = aLighting;
     block = aBlock;

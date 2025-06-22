@@ -70,18 +70,18 @@ void main() {
     vec4 image = texture2D(atlas, uv);
 
     vec3 frag_color = image.rgb * lighting;
-    vec3 result = frag_color;
-    //frag_color = calc_dirlight(dirlight, image.rgb);
 
+    // Dirlight ?
+    frag_color = calc_dirlight(dirlight, image.rgb);
+
+    // Water
+    // if (frag_color == 10) {
+    //     frag_color = vec3(0,0,1);
+    // }
     // Selection
-    if (block == selection) {
-        result = mix(vec3(0), frag_color, 0.5);
-        
-        // ivec3 face_dir = ivec3(round(normal));
-        // if (face_dir == selection_face) {
-        //     result = mix(vec3(0), frag_color, 0.5);
-        // }
+    else if (block == selection) {
+        frag_color = mix(vec3(0), frag_color, 0.5);
     }
 
-    FragColor = vec4(result, 1.0);
+    FragColor = vec4(frag_color, 1.0);
 }
