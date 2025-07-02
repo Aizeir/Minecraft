@@ -13,8 +13,6 @@ uniform vec3 color;
 uniform vec3 light_color;
 uniform vec3 light_pos;
 uniform vec3 camera_pos;
-uniform ivec3 selection;
-uniform ivec3 selection_face;
 
 struct Material {
     int id;
@@ -68,17 +66,11 @@ vec3 calc_dirlight(DirLight light, vec3 image) {
 
 void main() {
     vec4 image = texture2D(atlas, uv);
-
     vec3 frag_color = image.rgb * lighting;
 
-    // Dirlight ?
+    // Dirlight
     frag_color = calc_dirlight(dirlight, image.rgb);
 
-    // Selection
-    if (block == selection) {
-        frag_color = mix(vec3(0), frag_color, 0.5);
-    }
-
     // Water
-    FragColor = vec4(frag_color, 1.0);
+    FragColor = vec4(frag_color, .5);
 }

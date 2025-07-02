@@ -69,11 +69,18 @@ class Chunk {public:
 
         // Choix des blocs
         for (int y=0;y<CHUNK_H;y++) {
+            // Above ground
             if (y >= ground+1) {
-                map[x][z][y] = AIR;
+                if (y <= SEA_LEVEL) {
+                    map[x][z][y] = WATER;
+                }
+                else {
+                    map[x][z][y] = AIR;
+                }
             }
+            // Ground layer
             else if (y >= ground-2) {
-                if (ground > SEA_LEVEL) {
+                if (ground > SEA_LEVEL + 1) {
                     if (y == ground) {map[x][z][y] = GRASS;}
                     else {map[x][z][y] = DIRT;}
                 }
@@ -81,6 +88,7 @@ class Chunk {public:
                     map[x][z][y] = SAND;
                 }
             }
+            // Underground
             else if (y >= 1) {
                 int r = randint(1,100);
                 if (r <= 1) {
@@ -96,6 +104,7 @@ class Chunk {public:
                     map[x][z][y] = STONE;
                 }
             }
+            // Bedrock
             else if (y == 0) {
                 map[x][z][y] = BEDROCK;
             }
@@ -111,7 +120,7 @@ class Chunk {public:
         // Valeur du tree noise (-1/1)
         float tree_val = (world->tree_noise.GetNoise((float)(cx*CHUNK_W + x), (float)(cz*CHUNK_D + z)) + 1.0f)/2.0f;
         tree_val = (tree_val / 20.f);
-        if ((ground >= SEA_LEVEL+1) && (tree_val >= (float)rand() / (float)RAND_MAX)) {
+        if ((ground > SEA_LEVEL+1) && (tree_val >= (float)rand() / (float)RAND_MAX)) {
             plant_tree(x,ground+1,z);
         }
         }}
@@ -139,10 +148,16 @@ class Chunk {public:
     }
 
     vector<Vertex> vertices;
+    vector<Vertex> water_vertices;
     void create_mesh() {
+
+        // Qq trucs
         is_new = false;
         vertices.clear();
         vertices.reserve(ESTIMATED_NUM_VERTICES);
+        water_vertices.clear();
+        water_vertices.reserve(ESTIMATED_NUM_VERTICES);
+
         // Parcourir tous les blocs
         for (int x=0;x<CHUNK_W;x++) {
         for (int y=0;y<CHUNK_H;y++) {
@@ -164,31 +179,59 @@ class Chunk {public:
             // Bloc voisin
             ivec3 n(x + IDIRS[face_idx].x, y + IDIRS[face_idx].y, z + IDIRS[face_idx].z);
 
-            // La face est elle visible ?
-            bool hidden;
-            if (in_chunk_local(n.x, n.y, n.z))
-                hidden = is_solid_local(n.x, n.y, n.z);
-            else
-                hidden = world->is_solid(chunk_x*CHUNK_W+n.x, n.y, chunk_z*CHUNK_D+n.z);
-
-            if (!hidden) {
-                // Lighting
+            // Face (est-elle visible ?)
+            bool face_hidden; 
+            if (in_chunk_local(n.x, n.y, n.z)) {
+                if (id == WATER) {
+                    face_hidden = get_local_block(n.x, n.y, n.z) == WATER;
+                }
+                else {
+                    face_hidden = is_solid_local(n.x, n.y, n.z);
+                }
+            }
+            else {
+                if (id == WATER) {
+                    face_hidden = (world->get_block(chunk_x*CHUNK_W+n.x, n.y, chunk_z*CHUNK_D+n.z) == WATER);
+                }
+                else {
+                    face_hidden = world->is_solid(chunk_x*CHUNK_W+n.x, n.y, chunk_z*CHUNK_D+n.z);
+                }
+            }
+            
+            if (!face_hidden) {
+                // Valeur de luminosité
                 vec3 normal = cube_faces[face_idx][0].normal;
                 float value = max(0.f, (dot(light_direction, -normal)+1.0f)/2.0f);
                 float lighting = pow(value, 1.0f / 2.2f) * 2; // gamma
 
-                // Copier tous les vertices
+                // Ajouter la face (6 vertices)
                 for (int vert_idx=0;vert_idx<6;vert_idx++) {
                     Vertex vertex = cube_faces[face_idx][vert_idx];
                     vertex.pos += block;
-                    vertex.id = BlockData[id].faces[face_idx];
+                    vertex.face = BlockData[id].faces[face_idx];
                     vertex.lighting = lighting;
                     vertex.block = block;
-                    vertices.push_back(vertex);
+                    
+                    if (id == WATER)
+                        water_vertices.push_back(vertex);
+                    else
+                        vertices.push_back(vertex);
+                }
+
+                // Water: ajouter une face de l'autre sens
+                if (id == WATER && DIRS[face_idx] == UP) {
+                    for (int vert_idx=5;vert_idx>=0;vert_idx--) {
+                        Vertex vertex = cube_faces[face_idx][vert_idx];
+                        vertex.pos += block;
+                        vertex.face = BlockData[id].faces[face_idx];
+                        vertex.lighting = lighting;
+                        vertex.block = block;
+                        
+                        water_vertices.push_back(vertex);
+                    }
                 }
             }
         }
-
         }}}
     }
 
@@ -197,9 +240,15 @@ class Chunk {public:
     }
 
     void set_local_block(int x, int y, int z, int id) {
+        int old = map[x][z][y];
         map[x][z][y] = id;
         create_mesh();
         update_neighbor_meshes(x,y,z);
+
+        // De l'eau à été modifiée
+        if (old == WATER || id == WATER) {
+            // world->create_water_mesh();
+        }
     }
 
     bool in_chunk(int x, int y, int z) {
@@ -228,7 +277,7 @@ class Chunk {public:
 
     bool is_solid_local(int x, int y, int z) {
         if (!in_chunk_local(x,y,z)) return false;
-        return get_local_block(x,y,z) != AIR;
+        return !set_contains(&non_solid, get_local_block(x,y,z));
     }
 
     bool is_solid(int x, int y, int z) {
@@ -267,6 +316,7 @@ World::World(vec3 spawn_pos) {
     for (int cx = c.x-LOAD; cx <= c.x + LOAD; cx++) {
     for (int cz = c.y-LOAD; cz <= c.y + LOAD; cz++) {
         chunks[{cx, cz}] = Chunk(this, cx, cz);
+
     }}
 }
 
@@ -281,6 +331,7 @@ Chunk* World::get_chunk(int cx, int cz) {
 }
 
 Chunk* World::get_chunk_of_block(int x, int y, int z) {
+    if (!(0 <= y && y < CHUNK_H)) return nullptr;
     return get_chunk(get_chunk_pos(x,y,z));
 }
 
@@ -295,15 +346,14 @@ int World::get_block(int x, int y, int z) {
 }
 
 void World::set_block(int x, int y, int z, int id) {
-    if (!(0 <= y && y < CHUNK_H)) return;
     Chunk* chunk = get_chunk_of_block(x,y,z); if (chunk == nullptr) return;
     return chunk->set_block(x,y,z, id);
 }
 
 void World::set_block_struct(int x, int y, int z, int id) {
-    if (!(0 <= y && y < CHUNK_H)) return;
     Chunk* chunk = get_chunk_of_block(x,y,z);
     if (chunk == nullptr) {
+        if (!(0 <= y && y < CHUNK_H)) return;
         ivec2 chunk_pos = get_chunk_pos(x,y,z);
         structure_queue.push_back({
             x - chunk_pos.x*CHUNK_W,  y,  z - chunk_pos.y*CHUNK_D,

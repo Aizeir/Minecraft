@@ -4,6 +4,7 @@
 #include <sstream>
 #include <unordered_set>
 #include <filesystem>
+#include <array>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <math.h>
@@ -52,6 +53,8 @@ const vec3 DOWN =  vec3(0.0f, -1.0f, 0.0f);
 const vec3 FRONT = vec3(0.0f, 0.0f, -1.0f); 
 const vec3 BACK =  vec3(0.0f, 0.0f, 1.0f);
 const vec3 DIRS[6] = {LEFT, RIGHT, UP, DOWN, FRONT, BACK};
+
+const int MAX_INV = 8;
 
 // 0. UTIL
 string read_file(string path) {
@@ -132,10 +135,8 @@ string expand_shader_includes(const string& shader_code, const filesystem::path&
 }
 
 template <typename TYPENAME>
-TYPENAME clamp(TYPENAME value, TYPENAME minVal, TYPENAME maxVal) {
-    if (value < minVal) return minVal;
-    if (value > maxVal) return maxVal;
-    return value;
+bool set_contains(unordered_set<TYPENAME>* map, TYPENAME value) {
+    return map->find(value) != map->end();
 }
 
 ostream& operator<<(ostream& os, const glm::ivec2& v) {
@@ -174,6 +175,42 @@ int randint(int a, int b) {
 
 bool proba(int x) {
     return randint(1,x) == 1;
+}
+
+// III. Textures
+struct Texture { GLuint value; }; // sert juste a pas confondre avec les i/GL_TEXTURE_i
+Texture create_texture(int width, int height, int colormap, unsigned char* data=NULL, int src_format=GL_UNSIGNED_BYTE) {
+    unsigned int texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, colormap, width, height, 0, colormap, src_format, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    return {texture};
+}
+
+void bind_texture(GLenum unit, Texture texture) {
+    glActiveTexture(unit);
+    glBindTexture(GL_TEXTURE_2D, texture.value);
+}
+
+Texture load_texture(const char* path, int colormap, vec2 *size=nullptr) {
+    stbi_set_flip_vertically_on_load(true);
+
+    // Load image data
+    int width, height, num_channels;
+    unsigned char *data = stbi_load(path, &width, &height, &num_channels, 0);
+    stbi_image_free(data);
+    if (size != nullptr) *size = vec2(width, height);
+
+    // Get texture
+    return create_texture(width, height, colormap, data);
 }
 
 // I. SHADERS
@@ -219,6 +256,7 @@ unsigned int load_shader_program(const char* vert_source, const char* frag_sourc
 class Program { public:
     unsigned int ID;
 
+    Program() {ID = 1000;};
     Program(string vert_path, string frag_path) {
         // files
         string vert_code_str = read_file(vert_path);
@@ -246,6 +284,11 @@ class Program { public:
     // ------------------------------------------------------------------------
     void set_int(const string &name, int value) const{
         glUniform1i(glGetUniformLocation(ID, name.c_str()), value); 
+    }
+    // ------------------------------------------------------------------------
+    void set_texture(const string &name, Texture texture, GLenum unit) const{
+        bind_texture(unit, texture);
+        glUniform1i(glGetUniformLocation(ID, name.c_str()), (int)(unit-GL_TEXTURE0)); 
     }
     // ------------------------------------------------------------------------
     void set_float(const string &name, float value) const{
@@ -279,7 +322,7 @@ struct Vertex {
     vec3 pos;
     vec3 normal;
     vec2 uv;
-    int id = 0;
+    int face = 0;
     float lighting = 1.0f;
     ivec3 block = {0,0,0};
 
@@ -288,11 +331,13 @@ struct Vertex {
         pos(x,y,z), normal(nx,ny,nz), uv(u,v) {};
 };
 
+
+
 ostream& operator<<(ostream& os, const Vertex& v) {
     return os << "Vertex " << v.pos
               << "; " << v.normal
               << "; " << v.uv
-              << "; " << v.id;
+              << "; " << v.face;
 }
 
 const int VERTEX_PER_FACE = 6;
@@ -353,7 +398,7 @@ Vertex cube_faces[6][VERTEX_PER_FACE] = {
     },
 };
 
-float quad_vertices[] = {
+float full_quad_vertices[] = {
     -1.0f,  1.0f,  0.0f, 1.0f,
     -1.0f, -1.0f,  0.0f, 0.0f,
     1.0f, -1.0f,  1.0f, 0.0f,
@@ -363,6 +408,20 @@ float quad_vertices[] = {
     1.0f,  1.0f,  1.0f, 1.0f
 };
 
+array<float, 24> quad_rect(float x, float y, float w, float h) {
+    float min_nx = x / Wf *2-1, min_ny = y / Hf *2-1;
+    float max_nx = (x+w) / Wf *2-1, max_ny = (y+h) / Hf *2-1;
+
+    return {
+        min_nx,  max_ny,  0.0f, 1.0f,
+        min_nx,  min_ny,  0.0f, 0.0f,
+        max_nx,  min_ny,  1.0f, 0.0f,
+
+        min_nx,  max_ny,  0.0f, 1.0f,
+        max_nx,  min_ny,  1.0f, 0.0f,
+        max_nx,  max_ny,  1.0f, 1.0f
+    };
+}
 
 // unsigned int cube_indices[] = {
 //     0,1,2, 1,0,3,
@@ -373,49 +432,12 @@ float quad_vertices[] = {
 //     0,1,2, 2,3,0,
 // };
 
-// III. Textures
-struct Texture {
-    unsigned int texture;
-    uint unit;
-};
-
-void bind_texture(Texture texture) {
-    glActiveTexture(GL_TEXTURE0 + texture.unit);
-    glBindTexture(GL_TEXTURE_2D, texture.texture);
-}
-
-unsigned int texture_next_unit = 0;
-Texture load_texture(const char* path, uint colormap, bool bind=false) {
-    unsigned int texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    stbi_set_flip_vertically_on_load(true);
-
-    int width, height, num_channels;
-    unsigned char *data = stbi_load(path, &width, &height, &num_channels, 0);
-
-    glTexImage2D(GL_TEXTURE_2D, 0, colormap, width, height, 0, colormap, GL_UNSIGNED_BYTE, data);
-    glGenerateMipmap(GL_TEXTURE_2D);
-
-    stbi_image_free(data);
-
-    Texture texture_obj = {texture, texture_next_unit};
-    texture_next_unit += 1;
-
-    if (bind) bind_texture(texture_obj);
-    return texture_obj;
-}
 
 // ? - MONDE
 const int CHUNK_W = 16;
 const int CHUNK_H = 30;
 const int CHUNK_D = 16;
-const int LOAD = 8;
+const int LOAD = 6;
 const int SEA_LEVEL = 10;
 const int BED_LEVEL = 4;
 
@@ -435,6 +457,41 @@ const float JUMP_FORCE = 13.0f;
 vec3 light_direction = normalize(vec3(-0.2f, -1.0f, -0.3f));
 const ivec3 SELECTION_DEFAULT = {0, -1, 0};
 
+// - FRAMEBUFFERS
+int renderbuffer(int w, int h, int component) {
+    unsigned int rbo;
+    glGenRenderbuffers(1, &rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo);  
+    glRenderbufferStorage(GL_RENDERBUFFER, component, w, h);
+    return rbo;
+}
+
+pair<uint,Texture> create_framebuffer(int w, int h) {
+    // Framebuffer object
+    unsigned int fbo;
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+
+    // Color buffer
+    Texture color = create_texture(w,h, GL_RGB);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color.value, 0);
+
+    // Depth buffer
+    //     *depth = create_texture(w,h, GL_DEPTH_COMPONENT);
+    //     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth->texture, 0);
+    int rbo = renderbuffer(w,h, GL_DEPTH_COMPONENT);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+    // Rebind default, return
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    return {fbo, color};
+}
+
+void bind_framebuffer(int fbo=0, int w=W, int h=H) {
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glViewport(0,0, w,h);
+}
 
 // DEBUG
 GLenum glCheckError(const char *file, int line) {

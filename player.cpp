@@ -2,6 +2,7 @@
 #include "util.cpp"
 #include "world.cpp"
 #include "camera.cpp"
+#include "block.cpp"
 
 bool rect3d_collision(vec3 a1, vec3 a2, vec3 b1, vec3 b2) {
     // Check for overlap in all three axes
@@ -22,6 +23,7 @@ class Player { public:
     vec3 speed = vec3();
     bool sprint = false;
     bool ground = false;
+    bool underwater = false;
 
     Player(Camera* camera): camera(camera) {
         pos = &(camera->pos);
@@ -67,12 +69,31 @@ class Player { public:
         return false;
     }
 
+    vector<pair<int, int>> inventory;
+    bool add_item(int item) {
+        // Item déjà dans l'inventaire
+        int size = inventory.size();
+        for (int i=0; i<size; i++) {
+            if (inventory[i].first == item) {
+                inventory[item].second += 1;
+                return true;
+            }
+        }
+        // Nouveau slot
+        if (inventory.size() < MAX_INV) {
+            inventory.push_back({item, 1});
+            return true;
+        }
+        // Plus de place
+        else return false;
+    }
+
     void update(float dt, World* world) {
         // camera
         camera->update(dt, world);
         
         // gravity
-        speed.y -= GRAVITY;
+        speed.y = max(speed.y - GRAVITY, -GRAVITY*20);
         ground = false;
 
         // Collisions
@@ -96,5 +117,10 @@ class Player { public:
         else {
             pos->z += dv.z;
         }
+
+        
+        // underwater
+        ivec3 block_pos = get_block();
+        underwater = (world->get_block(block_pos) == WATER);
     }
 };

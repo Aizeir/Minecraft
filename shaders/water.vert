@@ -16,11 +16,16 @@ flat out ivec3 block;
 
 uniform mat4 transform;
 uniform vec2 atlas_size;
+uniform float time;
 
 void main() {
-    gl_Position = transform * vec4(aPos, 1.0);
+    vec3 pos = aPos;
+    if (face == 2) {
+        pos.y -= .2 + sin(pos.x + time)*.1 + sin(pos.z + time)*.1;
+    }
+    gl_Position = transform * vec4(pos, 1.0);
 
-    frag_pos = aPos;
+    frag_pos = pos;
     normal = aNormal;
     uv = (vec2(aFace % 4, atlas_size.y - 1 - aFace / 4) + aTexCoord) / atlas_size;
     face = aFace;

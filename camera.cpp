@@ -26,7 +26,7 @@ class Camera { public:
     float yaw, pitch;
 
     Camera() {
-        pos = vec3(0.5f,24.0f,0.5f);
+        pos = vec3(0.5f,CHUNK_H*2,0.5f);
         front = vec3(0.f,0.f,-1.f);
         yaw = -90.0f;
     }
@@ -95,6 +95,11 @@ class Camera { public:
 
         // Retourne une valeur par défaut si aucun bloc solide n'est touché
         return {SELECTION_DEFAULT, SELECTION_DEFAULT};
+    }
+
+    void reflect() {
+        pos.y = 2*SEA_LEVEL - pos.y;
+        pitch = - pitch;
     }
 
     void update(float dt, World* world) {
