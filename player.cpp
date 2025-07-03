@@ -3,6 +3,7 @@
 #include "world.cpp"
 #include "camera.cpp"
 #include "block.cpp"
+#include <functional>
 
 bool rect3d_collision(vec3 a1, vec3 a2, vec3 b1, vec3 b2) {
     // Check for overlap in all three axes
@@ -17,6 +18,7 @@ class Player { public:
 
     const float movement_speed = 4.0f;
     const float sprint_speed = 8.0f;
+    const float water_sprint_speed = 10.0f;
     const vec3 size = vec3(0.5f,1.5f,0.5f);
     const vec3 cam_off = vec3(0.0f, 0.75f, 0.0f);
 
@@ -25,11 +27,18 @@ class Player { public:
     bool ground = false;
     bool underwater = false;
 
+    ivec3 breaking = BLOCK_DEFAULT;
+    float break_time;
+
+    vec2 mouse_press;
+
     Player(Camera* camera): camera(camera) {
         pos = &(camera->pos);
+        inventory.push_back({GRASS_BLOCK, 33});
+        inventory.push_back({PLANKS, 10});
     }
 
-    float get_speed() { return sprint ? sprint_speed : movement_speed; }
+    float get_speed() { return sprint ? (underwater ? water_sprint_speed : sprint_speed) : movement_speed; }
     
     ivec3 get_block() { return ivec3(floor(*pos)); }
 
@@ -88,15 +97,20 @@ class Player { public:
         else return false;
     }
 
-    void update(float dt, World* world) {
+    void update(float dt, World* world, function<void()> update_projection) {
         // camera
         camera->update(dt, world);
         
         // gravity
-        speed.y = max(speed.y - GRAVITY, -GRAVITY*20);
-        ground = false;
+        if (underwater) {
+            speed.y = max(speed.y - WATER_GRAVITY, -WATER_GRAVITY*10);
+        }
+        else {
+            speed.y = max(speed.y - GRAVITY, -GRAVITY*60);
+        }
 
         // Collisions
+        ground = false;
         vec3 dv = speed*dt; 
         if (collisions(world, vec3(dv.x, 0.0f, 0.0f))) {
             speed.x = 0;
@@ -121,6 +135,29 @@ class Player { public:
         
         // underwater
         ivec3 block_pos = get_block();
-        underwater = (world->get_block(block_pos) == WATER);
+        bool _underwater = (world->get_block(block_pos) == WATER);
+        if (underwater != _underwater) {
+            speed.y = max(speed.y, 0.0f);
+            if (speed.y > 0) speed.y = WATER_JUMP_FORCE * 3;
+            underwater = _underwater;
+            update_projection();
+        };
+
+        // Break block
+        // break end
+        if (breaking != BLOCK_DEFAULT) {
+            if (camera->selection != breaking) {
+                breaking = BLOCK_DEFAULT;
+            }
+            else if ((glfwGetTime() - break_time) >= BREAK_DURATION) {
+                world->set_block(breaking, AIR);
+                breaking = BLOCK_DEFAULT;
+            }
+        }
+        // break begin
+        if (mouse_press.x && camera->selecting && (breaking != camera->selection) && (world->get_block(camera->selection) != BEDROCK)) {
+            breaking = camera->selection;
+            break_time = glfwGetTime();
+        }
     }
 };

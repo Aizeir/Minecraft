@@ -5,7 +5,7 @@
 
 enum Items {
     AIR = -1,
-    GRASS = 0,
+    GRASS_BLOCK = 0,
     DIRT = 1,
     STONE = 2,
     IRON = 3,
@@ -19,19 +19,27 @@ enum Items {
     PLANKS = 11,
     BEDROCK = 12,
     WATER = 13,
+    GRASS = 14,
 };
 
+enum BlockState {
+    TERRAIN,
+    LIQUID,
+    PROP,
+};
 
 struct Block {
     int id;
     string name;
+    BlockState state;
     array<int, 6> faces; // left right up down front back
 
-    Block(int id, string name, const array<int, 6>& faces) : id(id), name(name), faces(faces) {}
+    Block(int id, string name, const array<int, 6>& faces, BlockState state=BlockState::TERRAIN) :
+          id(id), name(name), state(state), faces(faces) {}
 };
 
 Block BlockData[] = {
-    Block(GRASS, "grass", {2,2,0,1,2,2}),
+    Block(GRASS_BLOCK, "grass_block", {2,2,0,1,2,2}),
     Block(DIRT, "dirt",  {1,1,1,1,1,1}),
     Block(STONE, "stone", {3,3,3,3,3,3}),
     Block(IRON, "iron",  {4,4,7,7,4,4}),
@@ -44,7 +52,8 @@ Block BlockData[] = {
     Block(LEAVES, "leaves",  {12,12,12,12,12,12}),
     Block(PLANKS, "planks",  {13,13,13,13,13,13}),
     Block(BEDROCK, "bedrock",  {14,14,14,14,14,14}),
-    Block(WATER, "water",  {17,17,17,17,17,17}),
+    Block(WATER, "water",  {17,17,17,17,17,17}, BlockState::LIQUID),
+    Block(GRASS, "grass", {18,18,18,18,18,18}, BlockState::PROP),
 };
 
 struct Item {
@@ -55,7 +64,7 @@ struct Item {
 };
 
 Item ItemData[] = {
-    Item("grass", GRASS),
+    Item("grass", GRASS_BLOCK),
     Item("dirt", DIRT),
     Item("stone", STONE),
     Item("iron", IRON),
@@ -89,7 +98,3 @@ const std::array<std::array<int, 4>, 11> tree_structure = {{
     {{1,4,0,LEAVES}},
     {{-1,4,0,LEAVES}}
 }};
-
-static unordered_set<int> non_solid = {
-    AIR, WATER
-};

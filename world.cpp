@@ -4,6 +4,9 @@
 #include <vector>
 #include <unordered_map>
 #include "block.cpp"
+#include "terrain.cpp"
+#include "water.cpp"
+#include "prop.cpp"
 
 struct pair_hash {
     std::size_t operator()(const std::pair<int, int>& p) const {
@@ -53,8 +56,10 @@ class Chunk {public:
     bool is_new;
 
     int compute_ground(int x, int z) {
-        float value = (world->noise.GetNoise((float)(chunk_x*CHUNK_W + x), (float)(chunk_z*CHUNK_D + z)) + 1.0f)/2.0f;
-        int ground = BED_LEVEL + (int)(value * (CHUNK_H - BED_LEVEL - 5)); // entre 0 et CHUNK_H-1
+        vec2 pos = vec2((float)(chunk_x*CHUNK_W + x), (float)(chunk_z*CHUNK_D + z));
+        float value = world->noise.GetNoise(pos.x,pos.y);
+        float result = pow((value +1.f)/2.f, 1.5f);
+        int ground = BED_LEVEL + (int)(result * (CHUNK_H - BED_LEVEL - 5)); // entre 0 et CHUNK_H-1
         return ground;
     }
 
@@ -74,6 +79,9 @@ class Chunk {public:
                 if (y <= SEA_LEVEL) {
                     map[x][z][y] = WATER;
                 }
+                else if (y == ground+1 && proba(10) && map[x][z][y-1] == GRASS_BLOCK) {
+                    map[x][z][y] = GRASS;
+                }
                 else {
                     map[x][z][y] = AIR;
                 }
@@ -81,7 +89,7 @@ class Chunk {public:
             // Ground layer
             else if (y >= ground-2) {
                 if (ground > SEA_LEVEL + 1) {
-                    if (y == ground) {map[x][z][y] = GRASS;}
+                    if (y == ground) {map[x][z][y] = GRASS_BLOCK;}
                     else {map[x][z][y] = DIRT;}
                 }
                 else {
@@ -120,7 +128,7 @@ class Chunk {public:
         // Valeur du tree noise (-1/1)
         float tree_val = (world->tree_noise.GetNoise((float)(cx*CHUNK_W + x), (float)(cz*CHUNK_D + z)) + 1.0f)/2.0f;
         tree_val = (tree_val / 20.f);
-        if ((ground > SEA_LEVEL+1) && (tree_val >= (float)rand() / (float)RAND_MAX)) {
+        if ((ground > SEA_LEVEL+1) && (map[x][z][ground+1] == AIR) && (tree_val >= (float)rand() / (float)RAND_MAX)) {
             plant_tree(x,ground+1,z);
         }
         }}
@@ -147,8 +155,9 @@ class Chunk {public:
         }
     }
 
-    vector<Vertex> vertices;
-    vector<Vertex> water_vertices;
+    vector<T_Vertex> vertices;
+    vector<W_Vertex> water_vertices;
+    vector<P_Vertex> prop_vertices;
     void create_mesh() {
 
         // Qq trucs
@@ -157,6 +166,7 @@ class Chunk {public:
         vertices.reserve(ESTIMATED_NUM_VERTICES);
         water_vertices.clear();
         water_vertices.reserve(ESTIMATED_NUM_VERTICES);
+        prop_vertices.clear();
 
         // Parcourir tous les blocs
         for (int x=0;x<CHUNK_W;x++) {
@@ -167,69 +177,78 @@ class Chunk {public:
         ivec3 block(chunk_x*CHUNK_W+x, y, chunk_z*CHUNK_D+z);
         int id = get_local_block(x,y,z);
         if (id == AIR) continue;
+        BlockState state = BlockData[id].state;
 
         // Matrices (utile uniquement si +commpliqué que des translations)
         //mat4 model = glm::translate(mat4(1.0f), (vec3)block);
         //mat3 normal_mat = glm::mat3(glm::transpose(glm::inverse(model)));
         //normal = normalize(vec3(normal_mat * vec4(normal, 1.0f)));
         //vertex.normal = normalize(vec3(normal_mat * vec4(vertex.normal, 1.0f)));
+        
+        int num_faces = (state == BlockState::PROP) ? 2 : 6;
 
         // Blocs voisins
-        for (int face_idx=0; face_idx<6; face_idx++) {
+        for (int face_idx=0; face_idx<num_faces; face_idx++) {
             // Bloc voisin
             ivec3 n(x + IDIRS[face_idx].x, y + IDIRS[face_idx].y, z + IDIRS[face_idx].z);
 
             // Face (est-elle visible ?)
-            bool face_hidden; 
+            bool face_visible = true;
             if (in_chunk_local(n.x, n.y, n.z)) {
-                if (id == WATER) {
-                    face_hidden = get_local_block(n.x, n.y, n.z) == WATER;
-                }
-                else {
-                    face_hidden = is_solid_local(n.x, n.y, n.z);
-                }
+                if (state == BlockState::LIQUID)
+                    face_visible = !(get_local_block(n.x, n.y, n.z) == WATER);
+                else if (state == BlockState::TERRAIN)
+                    face_visible = !(is_solid_local(n.x, n.y, n.z));
             }
             else {
-                if (id == WATER) {
-                    face_hidden = (world->get_block(chunk_x*CHUNK_W+n.x, n.y, chunk_z*CHUNK_D+n.z) == WATER);
-                }
-                else {
-                    face_hidden = world->is_solid(chunk_x*CHUNK_W+n.x, n.y, chunk_z*CHUNK_D+n.z);
-                }
+                if (state == BlockState::LIQUID)
+                    face_visible = !(world->get_block(chunk_x*CHUNK_W+n.x, n.y, chunk_z*CHUNK_D+n.z) == WATER);
+                else if (state == BlockState::TERRAIN)
+                    face_visible = !(world->is_solid(chunk_x*CHUNK_W+n.x, n.y, chunk_z*CHUNK_D+n.z));
             }
             
-            if (!face_hidden) {
-                // Valeur de luminosité
+            // Ajouter la face si elle est visible
+            if (face_visible) {
+                // Luminosité
                 vec3 normal = cube_faces[face_idx][0].normal;
                 float value = max(0.f, (dot(light_direction, -normal)+1.0f)/2.0f);
-                float lighting = pow(value, 1.0f / 2.2f) * 2; // gamma
+                float lighting = 0.25 + value * 1.5;//pow(value, 1.0f / 2.2f) * 2; // gamma
 
-                // Ajouter la face (6 vertices)
-                for (int vert_idx=0;vert_idx<6;vert_idx++) {
-                    Vertex vertex = cube_faces[face_idx][vert_idx];
+                // -------- WATER --------
+                if (state == BlockState::LIQUID) {
+                bool double_face = (DIRS[face_idx] == UP); int vert_idx;
+                for (int idx=0;idx<(VERTEX_PER_FACE + VERTEX_PER_FACE *(int)double_face);idx++) {
+                    vert_idx = idx > 5 ? VERTEX_PER_FACE*2-1-idx : idx;
+
+                    W_Vertex vertex = cube_faces[face_idx][vert_idx];
                     vertex.pos += block;
                     vertex.face = BlockData[id].faces[face_idx];
                     vertex.lighting = lighting;
                     vertex.block = block;
                     
-                    if (id == WATER)
-                        water_vertices.push_back(vertex);
-                    else
-                        vertices.push_back(vertex);
+                    water_vertices.push_back(vertex);
                 }
-
-                // Water: ajouter une face de l'autre sens
-                if (id == WATER && DIRS[face_idx] == UP) {
-                    for (int vert_idx=5;vert_idx>=0;vert_idx--) {
-                        Vertex vertex = cube_faces[face_idx][vert_idx];
-                        vertex.pos += block;
-                        vertex.face = BlockData[id].faces[face_idx];
-                        vertex.lighting = lighting;
-                        vertex.block = block;
-                        
-                        water_vertices.push_back(vertex);
-                    }
                 }
+                // -------- TERRAIN --------
+                else if (state == BlockState::TERRAIN) { for (int vert_idx=0;vert_idx<VERTEX_PER_FACE;vert_idx++) {
+                    T_Vertex vertex = cube_faces[face_idx][vert_idx];
+                    vertex.pos += block;
+                    vertex.face = BlockData[id].faces[face_idx];
+                    vertex.lighting = lighting;
+                    vertex.block = block;
+                    
+                    vertices.push_back(vertex);
+                }}
+                // -------- PROP --------
+                else if (state == BlockState::PROP) { for (int vert_idx=0;vert_idx<VERTEX_PER_FACE;vert_idx++) {
+                    P_Vertex vertex = prop_faces[face_idx][vert_idx];
+                    vertex.pos += block;
+                    vertex.face = BlockData[id].faces[face_idx];
+                    vertex.lighting = lighting;
+                    vertex.block = block;
+                    
+                    prop_vertices.push_back(vertex);
+                }}
             }
         }
         }}}
@@ -242,13 +261,26 @@ class Chunk {public:
     void set_local_block(int x, int y, int z, int id) {
         int old = map[x][z][y];
         map[x][z][y] = id;
+        
+        ivec3 pos(chunk_x*CHUNK_W+x, y, chunk_z*CHUNK_D+z);
+        for (int i=0; i<6; i++) {
+            ivec3 dir = IDIRS[i]; ivec3 n = pos+dir;
+            // Ecoulement eau
+            if (id == AIR && dir != IDOWN && world->get_block(n) == WATER) {
+                world->set_block(pos, WATER);
+            }
+            else if (id == WATER && dir != IUP && world->get_block(n) == AIR) {
+                world->set_block(n, WATER);
+            }
+            // Cassage plantes
+            else if (id == AIR && dir == IUP && world->get_block(n) == GRASS) {
+                world->set_block(n, AIR); /// A "BREAK", pas set
+            }
+        }
+
+        // Recréér les meshs
         create_mesh();
         update_neighbor_meshes(x,y,z);
-
-        // De l'eau à été modifiée
-        if (old == WATER || id == WATER) {
-            // world->create_water_mesh();
-        }
     }
 
     bool in_chunk(int x, int y, int z) {
@@ -277,7 +309,8 @@ class Chunk {public:
 
     bool is_solid_local(int x, int y, int z) {
         if (!in_chunk_local(x,y,z)) return false;
-        return !set_contains(&non_solid, get_local_block(x,y,z));
+        int block = get_local_block(x,y,z);
+        return (block != AIR) && BlockData[block].state == BlockState::TERRAIN;
     }
 
     bool is_solid(int x, int y, int z) {
@@ -307,9 +340,11 @@ ostream& operator<<(ostream& os, const Chunk& chunk) {
 // WORLD
 
 World::World(vec3 spawn_pos) {
-    noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-    tree_noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    noise.SetNoiseType(FastNoiseLite::NoiseType_Perlin);
     noise.SetSeed(rand());
+    noise.SetFractalOctaves(4);
+    noise.SetFrequency(0.02);
+    tree_noise.SetNoiseType(FastNoiseLite::NoiseType_Perlin);
     tree_noise.SetSeed(rand());
     // Chunks
     ivec2 c = get_chunk_pos(spawn_pos);

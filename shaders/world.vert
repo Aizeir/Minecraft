@@ -10,6 +10,7 @@ layout (location = 5) in ivec3 aBlock;
 out vec3 frag_pos;
 out vec3 normal;
 out vec2 uv;
+out vec2 uv01;
 flat out int face;
 flat out float lighting;
 flat out ivec3 block;
@@ -23,6 +24,7 @@ void main() {
     frag_pos = aPos;
     normal = aNormal;
     uv = (vec2(aFace % 4, atlas_size.y - 1 - aFace / 4) + aTexCoord) / atlas_size;
+    uv01 = aTexCoord;
     face = aFace;
     lighting = aLighting;
     block = aBlock;

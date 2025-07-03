@@ -8,5 +8,5 @@ uniform vec4 image_rect;
 
 void main() {
     vec4 image_tex = texture2D(image, image_rect.xy + uv * image_rect.zw);
-    if (image_tex.a == 1.0) FragColor = image_tex;
+    FragColor = vec4(image_tex.rgb, 1.0);
 }

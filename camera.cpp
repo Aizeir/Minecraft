@@ -16,6 +16,7 @@ mat4 look_at(vec3 pos, vec3 target, vec3 fixed) {
     return glm::transpose(camera_basis) * glm::translate(mat4(1.f), -pos);
 }
 
+
 class Camera { public:
     const float sensibility = .1f;
 
@@ -32,8 +33,8 @@ class Camera { public:
     }
 
     bool selecting = false;
-    ivec3 selection = SELECTION_DEFAULT;
-    ivec3 selection_face = SELECTION_DEFAULT;
+    ivec3 selection = BLOCK_DEFAULT;
+    ivec3 selection_face = BLOCK_DEFAULT;
 
     std::array<ivec3, 2> raycast(World* world) {
         const float MAX_DISTANCE = 10.f;
@@ -54,7 +55,7 @@ class Camera { public:
         );
 
         // Si la caméra est déjà dans un bloc solide, retourne une valeur par défaut
-        // if (world->is_solid(block)) return {SELECTION_DEFAULT, SELECTION_DEFAULT};
+        // if (world->is_solid(block)) return {BLOCK_DEFAULT, BLOCK_DEFAULT};
 
         // Calcul des distances unitaires de déplacement dans chaque axe
         float distUnitX = direction.x != 0.0f ? abs(1.0f / direction.x) : numeric_limits<float>::infinity();
@@ -87,14 +88,16 @@ class Camera { public:
             }
 
             // Bloc solide
-            if (world->is_solid(block) && block != player_block) {
+            int id = world->get_block(block);
+            bool solid = id != AIR && BlockData[id].state != BlockState::LIQUID;
+            if (solid && block != player_block) {
                 selecting = true;
                 return {block, face};
             }
         }
 
         // Retourne une valeur par défaut si aucun bloc solide n'est touché
-        return {SELECTION_DEFAULT, SELECTION_DEFAULT};
+        return {BLOCK_DEFAULT, BLOCK_DEFAULT};
     }
 
     void reflect() {

@@ -33,7 +33,7 @@ class Overlay { public:
         float slot_w = rect.w / (float)MAX_INV;
         for (int i=0; i<player->inventory.size(); i++) {
             auto [item,amount] = player->inventory[i];
-            //blit(atlas, vec4(rect.x + i*slot_w, rect.y, slot_w, rect[3]), vec4(0,0,.25,.25));
+            blit(atlas, vec4(rect.x + i*slot_w, rect.y, slot_w, rect[3]), vec4(0,0,.25,.25));
         }
     }
 };

@@ -20,7 +20,7 @@ uniform float time;
 
 void main() {
     vec3 pos = aPos;
-    if (face == 2) {
+    if (aNormal.y == 1.0) {
         pos.y -= .2 + sin(pos.x + time)*.1 + sin(pos.z + time)*.1;
     }
     gl_Position = transform * vec4(pos, 1.0);

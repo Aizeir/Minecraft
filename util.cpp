@@ -35,6 +35,8 @@ const int H = 720;
 const float Wf = (float)W;
 const float Hf = (float)H;
 
+const vec3 SKY_COLOR(0.5f, 0.7f, 0.9f);
+
 inline float  rad(float  deg) {return glm::radians(deg);}
 inline double rad(double deg) {return glm::radians(deg);}
 
@@ -188,16 +190,10 @@ Texture create_texture(int width, int height, int colormap, unsigned char* data=
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
     glTexImage2D(GL_TEXTURE_2D, 0, colormap, width, height, 0, colormap, src_format, data);
     glGenerateMipmap(GL_TEXTURE_2D);
 
     return {texture};
-}
-
-void bind_texture(GLenum unit, Texture texture) {
-    glActiveTexture(unit);
-    glBindTexture(GL_TEXTURE_2D, texture.value);
 }
 
 Texture load_texture(const char* path, int colormap, vec2 *size=nullptr) {
@@ -287,7 +283,8 @@ class Program { public:
     }
     // ------------------------------------------------------------------------
     void set_texture(const string &name, Texture texture, GLenum unit) const{
-        bind_texture(unit, texture);
+        glActiveTexture(unit);
+        glBindTexture(GL_TEXTURE_2D, texture.value);
         glUniform1i(glGetUniformLocation(ID, name.c_str()), (int)(unit-GL_TEXTURE0)); 
     }
     // ------------------------------------------------------------------------
@@ -322,23 +319,11 @@ struct Vertex {
     vec3 pos;
     vec3 normal;
     vec2 uv;
-    int face = 0;
-    float lighting = 1.0f;
-    ivec3 block = {0,0,0};
 
     Vertex() = default;
     Vertex(float x, float y, float z, float nx, float ny, float nz, float u, float v) :
         pos(x,y,z), normal(nx,ny,nz), uv(u,v) {};
 };
-
-
-
-ostream& operator<<(ostream& os, const Vertex& v) {
-    return os << "Vertex " << v.pos
-              << "; " << v.normal
-              << "; " << v.uv
-              << "; " << v.face;
-}
 
 const int VERTEX_PER_FACE = 6;
 Vertex cube_faces[6][VERTEX_PER_FACE] = {
@@ -398,6 +383,12 @@ Vertex cube_faces[6][VERTEX_PER_FACE] = {
     },
 };
 
+ostream& operator<<(ostream& os, const Vertex& v) {
+    return os << "Vertex " << v.pos
+              << "; " << v.normal
+              << "; " << v.uv;
+}
+
 float full_quad_vertices[] = {
     -1.0f,  1.0f,  0.0f, 1.0f,
     -1.0f, -1.0f,  0.0f, 0.0f,
@@ -435,10 +426,10 @@ array<float, 24> quad_rect(float x, float y, float w, float h) {
 
 // ? - MONDE
 const int CHUNK_W = 16;
-const int CHUNK_H = 30;
+const int CHUNK_H = 50;
 const int CHUNK_D = 16;
 const int LOAD = 6;
-const int SEA_LEVEL = 10;
+const int SEA_LEVEL = 14;
 const int BED_LEVEL = 4;
 
 ivec2 get_chunk_pos(int x, int y, int z) {
@@ -453,9 +444,12 @@ bool in_chunk_local(int x, int y, int z) {
 }
 
 const float GRAVITY = 0.5f;
+const float WATER_GRAVITY = 0.2f;
 const float JUMP_FORCE = 13.0f;
+const float WATER_JUMP_FORCE = 2.0f;
 vec3 light_direction = normalize(vec3(-0.2f, -1.0f, -0.3f));
-const ivec3 SELECTION_DEFAULT = {0, -1, 0};
+const ivec3 BLOCK_DEFAULT = {0, -1, 0};
+const float BREAK_DURATION = 1;
 
 // - FRAMEBUFFERS
 int renderbuffer(int w, int h, int component) {
@@ -466,7 +460,7 @@ int renderbuffer(int w, int h, int component) {
     return rbo;
 }
 
-pair<uint,Texture> create_framebuffer(int w, int h) {
+pair<uint,pair<Texture,Texture>> create_framebuffer(int w, int h) {
     // Framebuffer object
     unsigned int fbo;
     glGenFramebuffers(1, &fbo);
@@ -478,14 +472,19 @@ pair<uint,Texture> create_framebuffer(int w, int h) {
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color.value, 0);
 
     // Depth buffer
-    //     *depth = create_texture(w,h, GL_DEPTH_COMPONENT);
-    //     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth->texture, 0);
-    int rbo = renderbuffer(w,h, GL_DEPTH_COMPONENT);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
+    Texture depth = create_texture(w,h, GL_DEPTH_COMPONENT, NULL, GL_UNSIGNED_INT);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth.value, 0);
+    // int rbo = renderbuffer(w,h, GL_DEPTH_COMPONENT);
+    // glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+    // Check framebuffer completeness
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        cerr << "ERROR: Framebuffer is not complete!" << endl;
+    }
 
     // Rebind default, return
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    return {fbo, color};
+    return {fbo, {color, depth}};
 }
 
 void bind_framebuffer(int fbo=0, int w=W, int h=H) {
