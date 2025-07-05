@@ -41,5 +41,6 @@ void main() {
     }
 
     // Water
-    FragColor = vec4(frag_color, image.a);
+    if (image.a == 0) discard;
+    FragColor = vec4(frag_color, 1.0);
 }

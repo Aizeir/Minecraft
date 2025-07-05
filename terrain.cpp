@@ -8,9 +8,9 @@ struct T_Vertex {
     T_Vertex() = default;
     T_Vertex(Vertex vertex) : pos(vertex.pos), normal(vertex.normal), uv(vertex.uv) {};
             
-    int face = 0;
-    float lighting = 1.0f;
-    ivec3 block = {0,0,0};
+    int face = 0; // texture de la face
+    float lighting = 1.0f; // niveau de luminosité
+    ivec3 block = {0,0,0}; // position du block (savoir si c'est la selection)
 };
 
 void set_terrain_vertex_attribs() {

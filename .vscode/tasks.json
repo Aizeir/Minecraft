@@ -22,9 +22,53 @@
             ],
             "group": {
                 "kind": "build",
-                "isDefault": true
-            },
+                "isDefault": false  
+            }
         },
+        {
+            "type": "cppbuild",
+            "label": "C/C++: Current file BUILD",
+            "command": "C:\\msys64\\ucrt64\\bin\\g++.exe",
+            "args": [
+            "-g",
+            "-Iinclude",
+            "-Llib",
+            "${file}",
+            "glad.c",
+            "-lglfw3dll",
+            "-o",
+            "${workspaceFolder}\\${fileBasenameNoExtension}.exe"
+            ],
+            "options": {
+            "cwd": "${fileDirname}"
+            },
+            "problemMatcher": [
+            "$gcc"
+            ],
+            "group": {
+            "kind": "build",
+            "isDefault": true
+            }
+        },
+        {
+            "type": "shell",
+            "label": "C/C++: Current file",
+            "dependsOn": "C/C++: Current file BUILD",
+            "command": "${workspaceFolder}\\${fileBasenameNoExtension}.exe",
+            "options": {
+            "cwd": "${fileDirname}"
+            },
+            "group": {
+            "kind": "build",
+            "isDefault": false
+            },
+            "presentation": {
+            "echo": true,
+            "reveal": "always",
+            "focus": false,
+            "panel": "shared"
+            }
+        }
     ],
     "version": "2.0.0"
 }

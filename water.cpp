@@ -7,10 +7,7 @@ struct W_Vertex {
     vec2 uv;
     W_Vertex() = default;
     W_Vertex(Vertex vertex) : pos(vertex.pos), normal(vertex.normal), uv(vertex.uv) {};
-            
-    int face = 0;
-    float lighting = 1.0f;
-    ivec3 block = {0,0,0};
+    float lighting;
 };
 
 void set_water_vertex_attribs() {
@@ -23,15 +20,9 @@ void set_water_vertex_attribs() {
     // - UV
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(W_Vertex), (void*)offsetof(W_Vertex, uv));
     glEnableVertexAttribArray(2);
-    // - Face ID
-    glVertexAttribIPointer(3, 1, GL_INT, sizeof(W_Vertex), (void*)offsetof(W_Vertex, face));
-    glEnableVertexAttribArray(3);
     // - Lighting value (per face)
-    glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(W_Vertex), (void*)offsetof(W_Vertex, lighting));
-    glEnableVertexAttribArray(4);
-    // - Block position
-    glVertexAttribIPointer(5, 3, GL_INT, sizeof(W_Vertex), (void*)offsetof(W_Vertex, block));
-    glEnableVertexAttribArray(5);
+    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(W_Vertex), (void*)offsetof(W_Vertex, lighting));
+    glEnableVertexAttribArray(3);
 }
 
 

@@ -26,6 +26,7 @@ class Player { public:
     bool sprint = false;
     bool ground = false;
     bool underwater = false;
+    bool flying = false;
 
     ivec3 breaking = BLOCK_DEFAULT;
     float break_time;
@@ -34,8 +35,8 @@ class Player { public:
 
     Player(Camera* camera): camera(camera) {
         pos = &(camera->pos);
-        inventory.push_back({GRASS_BLOCK, 33});
-        inventory.push_back({PLANKS, 10});
+        inventory.push_back({GRASS_BLOCK, 1});
+        inventory.push_back({PLANKS, 1});
     }
 
     float get_speed() { return sprint ? (underwater ? water_sprint_speed : sprint_speed) : movement_speed; }
@@ -63,7 +64,9 @@ class Player { public:
         for (int x = min_x; x <= max_x; x++) {
         for (int y = min_y; y <= max_y; y++) {
         for (int z = min_z; z <= max_z; z++) {
-        if (world->is_solid(x, y, z)) {
+
+        int block = world->get_block(x, y, z);
+        if ((block != AIR) && BlockData[block].state == BlockState::TERRAIN) {
 
             // if (dv.x < 0) { pos->x = x + 1 + side_plus.x; } // left = block.right <=> center = block.right + side
             // if (dv.x > 0) { pos->x = x - side_minus.x; }
@@ -79,6 +82,7 @@ class Player { public:
     }
 
     vector<pair<int, int>> inventory;
+    int selection = 0;
     bool add_item(int item) {
         // Item déjà dans l'inventaire
         int size = inventory.size();
@@ -100,6 +104,12 @@ class Player { public:
     void update(float dt, World* world, function<void()> update_projection) {
         // camera
         camera->update(dt, world);
+        
+        // flying
+        if (flying) {
+        ground = false;
+        *pos += speed * dt;
+        } else {
         
         // gravity
         if (underwater) {
@@ -131,8 +141,9 @@ class Player { public:
         else {
             pos->z += dv.z;
         }
+    
+        }
 
-        
         // underwater
         ivec3 block_pos = get_block();
         bool _underwater = (world->get_block(block_pos) == WATER);
@@ -149,7 +160,7 @@ class Player { public:
             if (camera->selection != breaking) {
                 breaking = BLOCK_DEFAULT;
             }
-            else if ((glfwGetTime() - break_time) >= BREAK_DURATION) {
+            else if ((glfwGetTime() - break_time) >= BREAK_DURATION || flying) {
                 world->set_block(breaking, AIR);
                 breaking = BLOCK_DEFAULT;
             }

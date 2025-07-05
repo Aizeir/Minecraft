@@ -22,12 +22,6 @@ Player player = Player(&camera);
 World world = World(camera.pos);
 
 void input(GLFWwindow *w, Camera& camera) {
-    // Wireframe mode
-    if (glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    else if (glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_RELEASE)
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
     // Moving
     player.sprint = (glfwGetKey(w, GLFW_KEY_F) == GLFW_PRESS);
     player.speed.x = player.speed.z = 0;
@@ -39,15 +33,31 @@ void input(GLFWwindow *w, Camera& camera) {
     if (glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS) player.speed += camera.right_xy * player.get_speed();
 
     // Jump
-    if (glfwGetKey(w, GLFW_KEY_SPACE) == GLFW_PRESS) {
-        if (!player.underwater && player.ground) {
-            player.speed.y = JUMP_FORCE;
-        }
-        else if (player.underwater) {
+    if (glfwGetKey(w, GLFW_KEY_SPACE) == GLFW_PRESS && !player.flying) {
+        if (player.underwater) {
             player.speed.y = WATER_JUMP_FORCE;
         }
+        else if (!player.underwater && player.ground) {
+            player.speed.y = JUMP_FORCE;
+        }
     }
+    // Fly down
+    if (player.flying) {
+        player.speed.y = FLY_FORCE * ((glfwGetKey(w, GLFW_KEY_SPACE) == GLFW_PRESS) - (glfwGetKey(w, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS));
+    }
+}
 
+int polygon_mode = GL_FILL;
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    // Wireframe mode
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        polygon_mode = (polygon_mode==GL_FILL) ? GL_LINE : GL_FILL;
+        glPolygonMode(GL_FRONT_AND_BACK, polygon_mode);
+    // Fly
+    if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
+        player.speed = vec3();
+        player.flying = !player.flying;
+    }
 }
 
 void mouse_callback(GLFWwindow* window, double mouse_x, double mouse_y) {
@@ -80,8 +90,16 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
     }
     // Place block
     if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS && camera.selecting) {
-        if (!player.collides(camera.selection+camera.selection_face))
-            world.set_block(camera.selection+camera.selection_face, PLANKS);
+        if (!player.collides(camera.selection+camera.selection_face) && (player.inventory.size() > 0)) {
+            pair<int,int> its = player.inventory.at(player.selection);
+            if (its.second > 0) {
+                its.second -= 1;
+                world.set_block(camera.selection+camera.selection_face, its.first);
+                
+                if (its.second <= 0)
+                    player.inventory.erase(player.inventory.begin() + player.selection);
+            }
+        }
     }}
 
 GLFWwindow* setup() {
@@ -99,7 +117,7 @@ GLFWwindow* setup() {
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetMouseButtonCallback(window, mouse_button_callback);
-    
+    glfwSetKeyCallback(window, key_callback);
     // Charger glad
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
     glViewport(0, 0, W, H);
@@ -123,6 +141,8 @@ class Game { public:
     Program crosshair_program, ui_program;
     // Textures
     Texture atlas, crosshair, breaking;
+    vec2 atlas_size = vec2(4,8);
+    vec2 atlas_img_size;
     // Framebuffer
     Texture world_texture, depth_texture;
     uint world_fbo;
@@ -147,7 +167,7 @@ class Game { public:
     // UTILISE GL_TEXTURE_0
     void set_default_uniforms(Program* program) {
         program->set_texture("atlas", atlas, GL_TEXTURE0);
-        program->set_vec2("atlas_size", vec2(4,8));
+        program->set_vec2("atlas_size", atlas_size);
 
         program->set_vec3("camera_pos", camera.pos);
         program->set_mat4("transform", projection * camera.view);
@@ -168,7 +188,7 @@ class Game { public:
     world_fbo = fb.first; world_texture = fb.second.first, depth_texture = fb.second.second;
 
     // Textures
-    atlas = load_texture("assets/atlas.png", GL_RGBA);
+    atlas = load_texture("assets/atlas.png", GL_RGBA, &atlas_img_size);
     crosshair = load_texture("assets/crosshair.png", GL_RGBA);
     breaking = load_texture("assets/breaking.png", GL_RGBA);
     
@@ -293,6 +313,7 @@ class Game { public:
         
         water_program.use();
         set_default_uniforms(&water_program);
+        water_program.set_int("water_face", BlockData[WATER].faces[0]);
 
         for (int cx = c.x-LOAD; cx <= c.x + LOAD; cx++) {
         for (int cz = c.y-LOAD; cz <= c.y + LOAD; cz++) {
@@ -352,7 +373,7 @@ class Game { public:
         glBindVertexArray(VAO_UI);
         glBindBuffer(GL_ARRAY_BUFFER, VBO_UI);
         ui_program.use(); 
-        overlay.draw(atlas);
+        overlay.draw(atlas, atlas_size, atlas_img_size);
 
         glEnable(GL_DEPTH_TEST);
 

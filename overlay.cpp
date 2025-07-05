@@ -25,15 +25,20 @@ class Overlay { public:
         glDrawArrays(GL_TRIANGLES, 0, 6);
     }
 
-    void draw(Texture atlas) {
+    void draw(Texture atlas, vec2 atlas_size, vec2 atlas_img_size) {
         // Inventory
         vec4 rect = vec4(Wf/2.f - hotbar_size.x * 3, Hf*.1f, hotbar_size.x * 6, hotbar_size.y * 6);
         blit(hotbar, rect);
         
-        float slot_w = rect.w / (float)MAX_INV;
+        float pixel = rect[3] / 12.f;
+        float slot_w = pixel * 8.f;
         for (int i=0; i<player->inventory.size(); i++) {
             auto [item,amount] = player->inventory[i];
-            blit(atlas, vec4(rect.x + i*slot_w, rect.y, slot_w, rect[3]), vec4(0,0,.25,.25));
+            int face = BlockData[item].faces[0];
+            vec4 crop = vec4(face % (int)atlas_size.x, atlas_size.y-1-floor(face/atlas_size.x), 1, 1); /// pixel size
+            
+            ui_program->set_bool("selection", i==player->selection);
+            blit(atlas, vec4(rect.x + pixel*2.f + i*(slot_w+pixel), rect.y + pixel*2.f, slot_w, slot_w), vec4(crop.x*8.f/atlas_img_size.x, crop.y*8.f/atlas_img_size.y, crop[2]*8.f/atlas_img_size.x, crop[3]*8.f/atlas_img_size.y));
         }
     }
 };

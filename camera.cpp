@@ -54,9 +54,6 @@ class Camera { public:
             (direction.z > 0.0f) ? 1 : -1
         );
 
-        // Si la caméra est déjà dans un bloc solide, retourne une valeur par défaut
-        // if (world->is_solid(block)) return {BLOCK_DEFAULT, BLOCK_DEFAULT};
-
         // Calcul des distances unitaires de déplacement dans chaque axe
         float distUnitX = direction.x != 0.0f ? abs(1.0f / direction.x) : numeric_limits<float>::infinity();
         float distUnitY = direction.y != 0.0f ? abs(1.0f / direction.y) : numeric_limits<float>::infinity();

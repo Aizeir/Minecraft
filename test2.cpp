@@ -1,19 +1,18 @@
 #include "util.cpp"
-#include "camera.cpp"
-#include "world.cpp"
-#include "player.cpp"
-#include "overlay.cpp"
-#include "block.cpp"
 
 
-void input(GLFWwindow *w, Camera& camera) {
-    if (glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    else if (glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_RELEASE)
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-}
+float quad_vertices[] = {
+    -1.0f,  1.0f,  0.0f, 1.0f,
+    -1.0f, -1.0f,  0.0f, 0.0f,
+    1.0f, -1.0f,  1.0f, 0.0f,
 
-GLFWwindow* setup() {
+    -1.0f,  1.0f,  0.0f, 1.0f,
+    1.0f, -1.0f,  1.0f, 0.0f,
+    1.0f,  1.0f,  1.0f, 1.0f
+};
+
+
+int main() {
     glfwInit();
     glfwWindowHint(GLFW_SAMPLES, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -23,76 +22,78 @@ GLFWwindow* setup() {
     GLFWwindow* window;
     window = glfwCreateWindow(W, H, "Minecraft", NULL, NULL);   
     glfwMakeContextCurrent(window);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
     glViewport(0, 0, W, H);
     glfwSetFramebufferSizeCallback(window, [](GLFWwindow* window, int width, int height) {
         glViewport(0, 0, width, height);
     });
-    glEnable(GL_CULL_FACE);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // SHADER
+    string vert_code_str = read_file("shaders/default.vert");
+    string frag_code_str = read_file("shaders/default.frag");
+    const char* vert_code = vert_code_str.c_str();
+    const char* frag_code = frag_code_str.c_str();
     
-    srand((unsigned)(time(0)));
-    return window;
-}
+    unsigned int vert = load_shader(GL_VERTEX_SHADER, vert_code);
+    unsigned int frag = load_shader(GL_FRAGMENT_SHADER, frag_code);
+    unsigned int program = load_program(vert, frag);
 
-class Game { public:
-    GLFWwindow* window;
-    Program ui_program;
-    uint VAO_UI, VBO_UI;
-    Texture hotbar; vec2 hotbar_size;
-    GLenum err;
+    glDeleteShader(vert);
+    glDeleteShader(frag);
 
-    Game() {
-    window = setup();
-    err = glGetError(); if (err != GL_NO_ERROR) cerr << "Begin openGL error: " << hex << err << endl;
+    // TEXTURE
+    unsigned int image;
+    glGenTextures(1, &image);
+    glBindTexture(GL_TEXTURE_2D, image);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    stbi_set_flip_vertically_on_load(true);
+
+    // Load image data
+    int width, height, num_channels;
+    unsigned char *data = stbi_load("assets/atlas.png", &width, &height, &num_channels, 0);
+
+    // Get texture
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    stbi_image_free(data);
+
+    // Bind texture to GL_TEXTURE0
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, image);
     
-    hotbar = load_texture("assets/inventory.png", GL_RGBA, &hotbar_size);
-    ui_program = Program("shaders/default.vert", "shaders/ui.frag");
-
+    // BUFFERS
+    unsigned int VAO_UI, VBO_UI;
     glGenBuffers(1, &VBO_UI);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO_UI);
-    
     glGenVertexArrays(1, &VAO_UI);
     glBindVertexArray(VAO_UI);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_UI);
 
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    err = glGetError(); if (err != GL_NO_ERROR) cerr << "End setup openGL error: " << hex << err << endl;
- 
+    glBufferData(GL_ARRAY_BUFFER, size(quad_vertices)*sizeof(float), quad_vertices, GL_STATIC_DRAW);
+    
+    // MAINLOOP
     while (!glfwWindowShouldClose(window)) {
-       
-        glDisable(GL_DEPTH_TEST);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glClearColor(1.0f, 1.0f, 1.0f, 0.0f); 
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f); 
         glClear(GL_COLOR_BUFFER_BIT);
         
         glBindVertexArray(VAO_UI);
         glBindBuffer(GL_ARRAY_BUFFER, VBO_UI);
 
-        vec4 rect = vec4(Wf/2.f - hotbar_size.x * 3, Hf*.1f, hotbar_size.x * 6, hotbar_size.y * 6);
-
-        array<float, 24> vertices;
-        vertices = quad_rect(rect[0], rect[1], rect[2], rect[3]);
-        glBufferData(GL_ARRAY_BUFFER, 24*sizeof(float), vertices.data(), GL_STATIC_DRAW);
-
-        ui_program.use(); 
-        ui_program.set_texture("image", hotbar, GL_TEXTURE0);
-        ui_program.set_vec4("image_rect", vec4(0,0,1,1));
+        glUseProgram(program);
+        glUniform1i(glGetUniformLocation(program, "image"), 0); 
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
-    }}
-};
-
-int main() {
-    Game game = Game();
-    glfwTerminate();
+    }
     return 0;
 }

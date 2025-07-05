@@ -5,9 +5,7 @@ out vec4 FragColor;
 in vec3 frag_pos;
 in vec3 normal;
 in vec2 uv;
-flat in int face;
 flat in float lighting;
-flat in ivec3 block;
 
 uniform vec3 color;
 uniform vec3 light_color;

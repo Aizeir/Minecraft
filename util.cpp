@@ -202,11 +202,12 @@ Texture load_texture(const char* path, int colormap, vec2 *size=nullptr) {
     // Load image data
     int width, height, num_channels;
     unsigned char *data = stbi_load(path, &width, &height, &num_channels, 0);
-    stbi_image_free(data);
     if (size != nullptr) *size = vec2(width, height);
 
     // Get texture
-    return create_texture(width, height, colormap, data);
+    Texture tex = create_texture(width, height, colormap, data);
+    stbi_image_free(data);
+    return tex;
 }
 
 // I. SHADERS
@@ -383,6 +384,59 @@ Vertex cube_faces[6][VERTEX_PER_FACE] = {
     },
 };
 
+// Vertex cube_vertices[] = {
+//     // Left face (x = 0)
+//     {0.0f, 1.0f, 1.0f,  -1.0f, 0.0f, 0.0f,  0.0f, 1.0f}, // 0
+//     {0.0f, 1.0f, 0.0f,  -1.0f, 0.0f, 0.0f,  1.0f, 1.0f}, // 1
+//     {0.0f, 0.0f, 0.0f,  -1.0f, 0.0f, 0.0f,  1.0f, 0.0f}, // 2
+//     {0.0f, 0.0f, 1.0f,  -1.0f, 0.0f, 0.0f,  0.0f, 0.0f}, // 3
+
+//     // Right face (x = 1)
+//     {1.0f, 1.0f, 1.0f,   1.0f, 0.0f, 0.0f,  1.0f, 1.0f}, // 4
+//     {1.0f, 1.0f, 0.0f,   1.0f, 0.0f, 0.0f,  0.0f, 1.0f}, // 5
+//     {1.0f, 0.0f, 0.0f,   1.0f, 0.0f, 0.0f,  0.0f, 0.0f}, // 6
+//     {1.0f, 0.0f, 1.0f,   1.0f, 0.0f, 0.0f,  1.0f, 0.0f}, // 7
+
+//     // Top face (y = 1)
+//     {0.0f, 1.0f, 0.0f,   0.0f, 1.0f, 0.0f,  0.0f, 1.0f}, // 8
+//     {1.0f, 1.0f, 0.0f,   0.0f, 1.0f, 0.0f,  1.0f, 1.0f}, // 9
+//     {1.0f, 1.0f, 1.0f,   0.0f, 1.0f, 0.0f,  1.0f, 0.0f}, // 10
+//     {0.0f, 1.0f, 1.0f,   0.0f, 1.0f, 0.0f,  0.0f, 0.0f}, // 11
+
+//     // Bottom face (y = 0)
+//     {0.0f, 0.0f, 0.0f,   0.0f, -1.0f, 0.0f,  0.0f, 1.0f}, // 12
+//     {1.0f, 0.0f, 0.0f,   0.0f, -1.0f, 0.0f,  1.0f, 1.0f}, // 13
+//     {1.0f, 0.0f, 1.0f,   0.0f, -1.0f, 0.0f,  1.0f, 0.0f}, // 14
+//     {0.0f, 0.0f, 1.0f,   0.0f, -1.0f, 0.0f,  0.0f, 0.0f}, // 15
+
+//     // Back face (z = 0)
+//     {0.0f, 0.0f, 0.0f,   0.0f, 0.0f, -1.0f,  0.0f, 0.0f}, // 16
+//     {1.0f, 0.0f, 0.0f,   0.0f, 0.0f, -1.0f,  1.0f, 0.0f}, // 17
+//     {1.0f, 1.0f, 0.0f,   0.0f, 0.0f, -1.0f,  1.0f, 1.0f}, // 18
+//     {0.0f, 1.0f, 0.0f,   0.0f, 0.0f, -1.0f,  0.0f, 1.0f}, // 19
+
+//     // Front face (z = 1)
+//     {0.0f, 0.0f, 1.0f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f}, // 20
+//     {1.0f, 0.0f, 1.0f,   0.0f, 0.0f, 1.0f,   1.0f, 0.0f}, // 21
+//     {1.0f, 1.0f, 1.0f,   0.0f, 0.0f, 1.0f,   1.0f, 1.0f}, // 22
+//     {0.0f, 1.0f, 1.0f,   0.0f, 0.0f, 1.0f,   0.0f, 1.0f}, // 23
+// };
+
+// unsigned int cube_indices[6][6] = {
+//     // Left
+//     {0, 1, 2,  0, 2, 3},
+//     // Right
+//     {4, 6, 5,  4, 7, 6},
+//     // Top
+//     {8, 9,10,  8,10,11},
+//     // Bottom
+//     {12,14,13, 12,15,14},
+//     // Back
+//     {16,18,17, 16,19,18},
+//     // Front
+//     {20,21,22, 20,22,23}
+// };
+
 ostream& operator<<(ostream& os, const Vertex& v) {
     return os << "Vertex " << v.pos
               << "; " << v.normal
@@ -447,6 +501,7 @@ const float GRAVITY = 0.5f;
 const float WATER_GRAVITY = 0.2f;
 const float JUMP_FORCE = 13.0f;
 const float WATER_JUMP_FORCE = 2.0f;
+const float FLY_FORCE = 5.0f;
 vec3 light_direction = normalize(vec3(-0.2f, -1.0f, -0.3f));
 const ivec3 BLOCK_DEFAULT = {0, -1, 0};
 const float BREAK_DURATION = 1;

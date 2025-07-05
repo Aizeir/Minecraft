@@ -28,7 +28,6 @@ class World {public:
     Chunk* get_chunk(int cx, int cz);
     Chunk* get_chunk_of_block(int x, int y, int z);
 
-    bool is_solid(int x, int y, int z);
     int get_block(int x, int y, int z);
     void set_block(int x, int y, int z, int id);
 
@@ -39,7 +38,6 @@ class World {public:
     Chunk* get_chunk(ivec2 c) {return get_chunk(c.x,c.y);}
     Chunk* get_chunk_of_block(ivec3 pos) {return get_chunk_of_block(pos.x,pos.y,pos.z);}
 
-    bool is_solid(ivec3 pos) {return is_solid(pos.x,pos.y,pos.z);}
     int get_block(ivec3 pos) {return get_block(pos.x,pos.y,pos.z);}
     void set_block(ivec3 pos, int id) {return set_block(pos.x,pos.y,pos.z, id);}
 };
@@ -193,19 +191,17 @@ class Chunk {public:
             ivec3 n(x + IDIRS[face_idx].x, y + IDIRS[face_idx].y, z + IDIRS[face_idx].z);
 
             // Face (est-elle visible ?)
+            int block_id;
+            if (in_chunk_local(n.x, n.y, n.z))
+                block_id = get_local_block(n.x, n.y, n.z);
+            else
+                block_id = world->get_block(chunk_x*CHUNK_W+n.x, n.y, chunk_z*CHUNK_D+n.z);
+            
             bool face_visible = true;
-            if (in_chunk_local(n.x, n.y, n.z)) {
-                if (state == BlockState::LIQUID)
-                    face_visible = !(get_local_block(n.x, n.y, n.z) == WATER);
-                else if (state == BlockState::TERRAIN)
-                    face_visible = !(is_solid_local(n.x, n.y, n.z));
-            }
-            else {
-                if (state == BlockState::LIQUID)
-                    face_visible = !(world->get_block(chunk_x*CHUNK_W+n.x, n.y, chunk_z*CHUNK_D+n.z) == WATER);
-                else if (state == BlockState::TERRAIN)
-                    face_visible = !(world->is_solid(chunk_x*CHUNK_W+n.x, n.y, chunk_z*CHUNK_D+n.z));
-            }
+            if (state == BlockState::LIQUID)
+                face_visible = !(block_id == WATER);
+            else if (state == BlockState::TERRAIN)
+                face_visible = !((block_id != AIR) && (block_id != LEAVES) &&BlockData[block_id].state == BlockState::TERRAIN);
             
             // Ajouter la face si elle est visible
             if (face_visible) {
@@ -222,10 +218,7 @@ class Chunk {public:
 
                     W_Vertex vertex = cube_faces[face_idx][vert_idx];
                     vertex.pos += block;
-                    vertex.face = BlockData[id].faces[face_idx];
                     vertex.lighting = lighting;
-                    vertex.block = block;
-                    
                     water_vertices.push_back(vertex);
                 }
                 }
@@ -307,19 +300,6 @@ class Chunk {public:
         return set_local_block(x,y,z, id);
     }
 
-    bool is_solid_local(int x, int y, int z) {
-        if (!in_chunk_local(x,y,z)) return false;
-        int block = get_local_block(x,y,z);
-        return (block != AIR) && BlockData[block].state == BlockState::TERRAIN;
-    }
-
-    bool is_solid(int x, int y, int z) {
-        if (y < 0 || y >= CHUNK_H) {return false;}
-        _check_in_chunk(x,y,z,__func__);
-        x -= chunk_x * CHUNK_W; z -= chunk_z * CHUNK_D;
-        return is_solid_local(x,y,z);
-    }
-
     void update_neighbor_meshes(int local_x, int y, int local_z) {
         int x = chunk_x*CHUNK_W + local_x, z = chunk_z*CHUNK_D + local_z;
 
@@ -368,11 +348,6 @@ Chunk* World::get_chunk(int cx, int cz) {
 Chunk* World::get_chunk_of_block(int x, int y, int z) {
     if (!(0 <= y && y < CHUNK_H)) return nullptr;
     return get_chunk(get_chunk_pos(x,y,z));
-}
-
-bool World::is_solid(int x, int y, int z) {
-    Chunk* chunk = get_chunk_of_block(x,y,z); if (chunk==nullptr) return false;
-    return chunk->is_solid(x,y,z);
 }
 
 int World::get_block(int x, int y, int z) {
